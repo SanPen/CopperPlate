@@ -10,14 +10,19 @@ plt.style.use('ggplot')
 
 class SolarFarm:
 
-    def __init__(self):
-        print()
+    def __init__(self, solar_radiation_profile):
+
+        self.normalized_solar_power = solar_radiation_profile / 1000.0
 
 
 class WindFarm:
 
-    def __init__(self):
-        print()
+    def __init__(self, wind_speed_profile, ag_curve_df):
+
+        # load the wind turbine power curve and normalize it
+        ag_curve = interp1d(ag_curve_df.index, ag_curve_df.values / ag_curve_df.values.max())
+
+        self.normalized_wind_power = ag_curve(wind_speed_profile)
 
 
 class Battery:
@@ -137,16 +142,15 @@ class MicroGrid:
         # load the solar irradiation in W/M2 and convert it to kW
         solar_radiation_profile = pd.read_excel(fname, sheetname='radiacion')['Radiación (MW/m2)'].values
 
-        self.normalized_solar_power = solar_radiation_profile / 1000.0
+        self.solar_farm = SolarFarm(solar_radiation_profile)
 
         # Load the wind speed in m/s
         wind_speed_profile = pd.read_excel(fname, sheetname='viento')['VEL(m/s):60'].values
 
         # load the wind turbine power curve and normalize it
-        df = pd.read_excel(fname, sheetname='AG_CAT')['P (MW)']
-        ag_curve = interp1d(df.index, df.values / df.values.max())
+        ag_curve_df = pd.read_excel(fname, sheetname='AG_CAT')['P (MW)']
 
-        self.normalized_wind_power = ag_curve(wind_speed_profile)
+        self.wind_farm = WindFarm(wind_speed_profile, ag_curve_df)
 
         # load the demand values and set it negative for the sign convention
         self.demand_profile = pd.read_excel(fname, sheetname='desaladora')['Demanda normalizada'].values * -1.0 * desalination_noinal_power
@@ -155,7 +159,7 @@ class MicroGrid:
         nt = len(wind_speed_profile)
         idx = [start + timedelta(hours=h) for h in range(nt)]
 
-        d = np.c_[self.demand_profile, self.normalized_wind_power, self.normalized_solar_power]
+        d = np.c_[self.demand_profile, self.wind_farm.normalized_wind_power, self.solar_farm.normalized_solar_power]
         cols = ['Demand', 'Wind', 'Solar']
         data = pd.DataFrame(data=d, index=idx, columns=cols)
 
@@ -195,9 +199,9 @@ class MicroGrid:
         ###############################################################################
         # Read the data file (this is a yearly profile)
         ###############################################################################
-        self.solar_power_profile = self.normalized_solar_power * x[0]
+        self.solar_power_profile = self.solar_farm.normalized_solar_power * x[0]
 
-        self.wind_power_profile = self.normalized_wind_power * x[1]
+        self.wind_power_profile = self.wind_farm.normalized_wind_power * x[1]
 
         '''
         The profiles sign as given are:
