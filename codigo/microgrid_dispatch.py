@@ -8,6 +8,18 @@ from poap.controller import ThreadController, BasicWorkerThread, SerialControlle
 plt.style.use('ggplot')
 
 
+class SolarFarm:
+
+    def __init__(self):
+        print()
+
+
+class WindFarm:
+
+    def __init__(self):
+        print()
+
+
 class Battery:
 
     def __init__(self, nominal_energy, charge_efficiency=0.9, discharge_efficiency=0.9, max_soc=0.99, min_soc=0.3):
@@ -43,9 +55,13 @@ class Battery:
         profiles sign
         Args:
             P: Power array: Negative charge, positive discharge
-
+            soc_0: State of charge at the beginning [0~1]
+            time: Array of datatime values
         Returns:
-
+            energy: Energy effectively processed by the battery
+            power: Power effectively processed by the battery
+            grid_power: Power dumped array
+            soc: Battery state of charge array
         """
         P = np.array(P)
         nt = len(P)
