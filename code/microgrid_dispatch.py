@@ -178,6 +178,8 @@ class MicroGrid:
         self.battery_losses = None
         self.battery_state_of_charge = None
 
+        self.optimization_values = None
+
     def __call__(self, x):
         return self.objfunction(x)
 
@@ -257,28 +259,6 @@ class MicroGrid:
 
         return sum(abs(self.grid_power))
 
-    # @staticmethod
-    # def eval_eq_constraints(x):
-    #     """
-    #     The equality constraint is that the summation of x must be 1
-    #     :param x:
-    #     :return:
-    #     """
-    #     return np.sum(x)
-    #
-    # @staticmethod
-    # def projection(x):
-    #     """
-    #     Function that brings unfeasible points into the feasible region
-    #     In this case this is mandatory because we have an equality constraint and all the
-    #     generated points that do not satisfy the constraint must be 'made' to satisfy it.
-    #     In this case if we normalize the vector x (x_nex = x / sum(x), it is sufficient to
-    #     fulfill that sum(x_nex) = 1
-    #     :param x:
-    #     :return:
-    #     """
-    #     return x / np.sum(x)
-
     def plot(self):
         # plot results
         plot_cols = 3
@@ -288,9 +268,9 @@ class MicroGrid:
 
         plt.figure(figsize=(16, 10))
         plt.subplot(plot_rows, plot_cols, 1)
-        plt.plot(self.demand_profile, label="Consumption Power")
+        plt.plot(self.demand_profile, label="Demand Power")
         plt.plot(self.solar_power_profile, label="Photovoltaic Power")
-        plt.plot(self.wind_power_profile, label="Photovoltaic Power")
+        plt.plot(self.wind_power_profile, label="Wind Power")
         plt.legend()
 
         plt.subplot(plot_rows, plot_cols, 2)
@@ -318,75 +298,84 @@ class MicroGrid:
         plt.plot(np.zeros(steps_number), 'k')
         plt.legend()
 
+    def optimize(self):
+        """
+        Function that optimizes a MicroGrid Object
+        Args:
 
-def optimize(data: MicroGrid):
-    """
-    Function that optimizes a MicroGrid Object
-    Args:
-        data: MicroGrid instance
+        Returns:
 
-    Returns:
+        """
+        # Decide how many evaluations we are allowed to use
+        maxeval = 1000
 
-    """
-    # Decide how many evaluations we are allowed to use
-    maxeval = 1000
+        # (1) Optimization problem
+        # print(data.info)
 
-    # (1) Optimization problem
-    # print(data.info)
+        # (2) Experimental design
+        # Use a symmetric Latin hypercube with 2d + 1 samples
+        exp_des = SymmetricLatinHypercube(dim=self.dim, npts=2 * self.dim + 1)
 
-    # (2) Experimental design
-    # Use a symmetric Latin hypercube with 2d + 1 samples
-    exp_des = SymmetricLatinHypercube(dim=data.dim, npts=2 * data.dim + 1)
+        # (3) Surrogate model
+        # Use a cubic RBF interpolant with a linear tail
+        surrogate = RBFInterpolant(kernel=CubicKernel, tail=LinearTail, maxp=maxeval)
 
-    # (3) Surrogate model
-    # Use a cubic RBF interpolant with a linear tail
-    surrogate = RBFInterpolant(kernel=CubicKernel, tail=LinearTail, maxp=maxeval)
+        # (4) Adaptive sampling
+        # Use DYCORS with 100d candidate points
+        adapt_samp = CandidateDYCORS(data=self, numcand=100 * self.dim)
 
-    # (4) Adaptive sampling
-    # Use DYCORS with 100d candidate points
-    adapt_samp = CandidateDYCORS(data=data, numcand=100 * data.dim)
+        # Use the serial controller (uses only one thread)
+        controller = SerialController(self.objfunction)
 
-    # Use the serial controller (uses only one thread)
-    controller = SerialController(data.objfunction)
+        # (5) Use the sychronous strategy without non-bound constraints
+        strategy = SyncStrategyNoConstraints(
+            worker_id=0, data=self, maxeval=maxeval, nsamples=1,
+            exp_design=exp_des, response_surface=surrogate,
+            sampling_method=adapt_samp)
+        controller.strategy = strategy
 
-    # (5) Use the sychronous strategy without non-bound constraints
-    strategy = SyncStrategyNoConstraints(
-        worker_id=0, data=data, maxeval=maxeval, nsamples=1,
-        exp_design=exp_des, response_surface=surrogate,
-        sampling_method=adapt_samp)
-    controller.strategy = strategy
+        # Run the optimization strategy
+        result = controller.run()
 
-    # Run the optimization strategy
-    result = controller.run()
+        # Print the final result
+        print('Best value found: {0}'.format(result.value))
+        print('Best solution found: {0}'.format(
+            np.array_str(result.params[0], max_line_width=np.inf,
+                         precision=5, suppress_small=True)))
 
-    # Print the final result
-    print('Best value found: {0}'.format(result.value))
-    print('Best solution found: {0}'.format(
-        np.array_str(result.params[0], max_line_width=np.inf,
-                     precision=5, suppress_small=True)))
+        # Extract function values from the controller
+        self.optimization_values = np.array([o.value for o in controller.fevals])
 
-    # Extract function values from the controller
-    fvals = np.array([o.value for o in controller.fevals])
+        return result.params[0]
 
-    f, ax = plt.subplots()
-    ax.plot(np.arange(0, maxeval), fvals, 'bo')  # Points
-    ax.plot(np.arange(0, maxeval), np.minimum.accumulate(fvals), 'r-', linewidth=4.0)  # Best value found
-    plt.xlabel('Evaluations')
-    plt.ylabel('Function Value')
-    plt.title(data.info)
-    # plt.show()
+    def plot_optimization(self):
+        """
+        Plot the optimization convergence
+        Returns:
 
-    return result.params[0]
+        """
+        if self.optimization_values is not None:
+            maxeval = len(self.optimization_values)
+            f, ax = plt.subplots()
+            ax.plot(np.arange(0, maxeval), self.optimization_values, 'bo')  # Points
+            ax.plot(np.arange(0, maxeval), np.minimum.accumulate(self.optimization_values), 'r-',
+                    linewidth=3.0)  # Best value found
+            plt.xlabel('Evaluations')
+            plt.ylabel('Function Value')
+            plt.title('Optimization convergence')
 
 if __name__ == '__main__':
 
     micro_grid = MicroGrid(fname='data.xls', start=datetime(2016, 1, 1), desalination_noinal_power=1000)
 
-    res_x = optimize(micro_grid)
+    res_x = micro_grid.optimize()
 
     res = micro_grid(res_x)
 
     micro_grid.plot()
+
+    micro_grid.plot_optimization()
+
     plt.show()
 
     # print(res)
