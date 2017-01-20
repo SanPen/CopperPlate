@@ -118,13 +118,17 @@ class BatterySystem:
 
         self.min_soc = min_soc
 
+        self.min_soc_charge = (self.max_soc + self.min_soc) / 2  # SoC state to force the battery charge
+
+        self.charge_per_cycle = 0.1  # charge 10% per cycle
+
         self.max_energy = battery_energy_max
 
         self.unitary_cost = unitary_cost
 
         self.results = None
 
-    def simulate_array(self, P, soc_0, time):
+    def simulate_array(self, P, soc_0, time, charge_if_needed=False):
         """
         The storage signs are the following
 
@@ -139,7 +143,8 @@ class BatterySystem:
         Args:
             P: Power array: Negative charge, positive discharge
             soc_0: State of charge at the beginning [0~1]
-            time: Array of datatime values
+            time: Array of DataTime values
+            charge_if_needed: Allow the battery to take extra power that is not given in P
         Returns:
             energy: Energy effectively processed by the battery
             power: Power effectively processed by the battery
@@ -158,6 +163,9 @@ class BatterySystem:
         grid_power = np.zeros(nt + 1)
         energy[0] = self.nominal_energy * soc_0
         soc[0] = soc_0
+
+        charge_energy_per_cycle = self.nominal_energy * self.charge_per_cycle
+
         for t in range(nt-1):
 
             if np.isnan(P[t]):
@@ -172,6 +180,10 @@ class BatterySystem:
             dt = (time[t + 1] - time[t]).seconds / 3600
 
             proposed_energy = energy[t] - P[t] * dt * eff
+
+            # charge the battery from the grid if the SoC is too low and we are allowing this behaviour
+            if charge_if_needed and soc[t] < self.min_soc_charge:
+                proposed_energy -= charge_energy_per_cycle / dt  # negative is for charging
 
             if proposed_energy > self.nominal_energy * self.max_soc:
 
@@ -324,7 +336,8 @@ class MicroGrid:
         self.Energy, \
         self.battery_output_power, \
         grid_power, \
-        self.battery_state_of_charge = self.battery_system.simulate_array(P=demanded_power, soc_0=SoC0, time=self.time)
+        self.battery_state_of_charge = self.battery_system.simulate_array(P=demanded_power, soc_0=SoC0,
+                                                                          time=self.time, charge_if_needed=True)
 
         # the processed values are 1 value shorter since we have worked with time increments
 
@@ -485,7 +498,7 @@ if __name__ == '__main__':
                            battery_system=battery,
                            demand_system=desalination_plant,
                            start=datetime(2016, 1, 1))
-    res_x = micro_grid.optimize(maxeval=500)
+    res_x = micro_grid.optimize(maxeval=5000)
     res = micro_grid(res_x)
     micro_grid.plot()
     micro_grid.plot_optimization()
