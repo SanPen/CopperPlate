@@ -144,7 +144,9 @@ class BatterySystem:
             P: Power array: Negative charge, positive discharge
             soc_0: State of charge at the beginning [0~1]
             time: Array of DataTime values
-            charge_if_needed: Allow the battery to take extra power that is not given in P
+            charge_if_needed: Allow the battery to take extra power that is not given in P. This limits the growth of
+            the battery system in the optimization since the bigger the battery, the more grid power it will take to
+            charge when RES cannot cope. Hence, since we're minimizing the grid usage, there is an optimum battery size
         Returns:
             energy: Energy effectively processed by the battery
             power: Power effectively processed by the battery
