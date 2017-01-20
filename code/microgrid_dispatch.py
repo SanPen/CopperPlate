@@ -141,7 +141,7 @@ class BatterySystem:
         to match these signs to the give profiles, we should invert the
         profiles sign
         Args:
-            P: Power array: Negative charge, positive discharge
+            P: Power array that is sent to the battery [Negative charge, positive discharge]
             soc_0: State of charge at the beginning [0~1]
             time: Array of DataTime values
             charge_if_needed: Allow the battery to take extra power that is not given in P. This limits the growth of
@@ -157,6 +157,7 @@ class BatterySystem:
         if self.nominal_energy is None:
             raise Exception('You need to set the battery nominal power!')
 
+        # initialize arrays
         P = np.array(P)
         nt = len(P)
         energy = np.zeros(nt + 1)
@@ -173,6 +174,7 @@ class BatterySystem:
             if np.isnan(P[t]):
                 print('NaN found!!!!!!')
 
+            # pick the right efficiency value
             if P[t] >= 0:
                 eff = self.discharge_efficiency
             else:
@@ -181,38 +183,36 @@ class BatterySystem:
             # the time comes in nanoseconds, we need the time step in hours
             dt = (time[t + 1] - time[t]).seconds / 3600
 
+            # compute the proposed energy. Later we check how much is actually possible
             proposed_energy = energy[t] - P[t] * dt * eff
 
             # charge the battery from the grid if the SoC is too low and we are allowing this behaviour
             if charge_if_needed and soc[t] < self.min_soc_charge:
                 proposed_energy -= charge_energy_per_cycle / dt  # negative is for charging
 
-            if proposed_energy > self.nominal_energy * self.max_soc:
-
-                # print('truncated: too high')
+            # Check the proposed energy
+            if proposed_energy > self.nominal_energy * self.max_soc:  # Truncated, too high
 
                 energy[t + 1] = self.nominal_energy * self.max_soc
                 power[t + 1] = (energy[t]-energy[t + 1]) / (dt * eff)
                 grid_power[t + 1] = - power[t + 1] + P[t]
 
-            elif proposed_energy < self.nominal_energy * self.min_soc:
-
-                # print('truncated: too low')
+            elif proposed_energy < self.nominal_energy * self.min_soc:  # Truncated, too low
 
                 energy[t + 1] = self.nominal_energy * self.min_soc
                 power[t + 1] = (energy[t]-energy[t + 1]) / (dt * eff)
                 grid_power[t + 1] = - power[t + 1] + P[t]
 
-            else:
-
-                # print('ok: within boundaries')
+            else:  # everything is within boundaries
 
                 energy[t + 1] = proposed_energy
                 power[t + 1] = P[t]
                 grid_power[t + 1] = 0
 
+            # Update the state of charge
             soc[t + 1] = energy[t + 1] / self.nominal_energy
 
+        # Compose a results DataFrame
         d = np.c_[np.r_[0, P[:-1]], power[:-1], grid_power[:-1], energy[:-1], soc[:-1] * 100]
         cols = ['P request', 'P', 'grid', 'E', 'SoC']
         self.results = pd.DataFrame(data=d, columns=cols)
