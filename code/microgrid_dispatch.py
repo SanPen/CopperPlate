@@ -11,6 +11,12 @@ plt.style.use('ggplot')
 class Demand:
 
     def __init__(self, profile, nominal_power):
+        """
+
+        Args:
+            profile: scale profile of the demand (all ones, for no change)
+            nominal_power: Nominal power of the demand facility
+        """
         self.index = None
 
         self.nominal_power = nominal_power
@@ -18,12 +24,23 @@ class Demand:
         self.normalized_power = profile * -1  # the convention is that loads are negative
 
     def power(self):
+        """
+        Returns the demanded power
+        Returns: Array
+        """
         return self.nominal_power * self.normalized_power
 
 
 class SolarFarm:
 
-    def __init__(self, profile, solar_power_max=10000):
+    def __init__(self, profile, solar_power_max=10000, unitary_cost=1):
+        """
+
+        Args:
+            profile: Solar horizontal irradiation profile (W/m2) [1D array]
+            solar_power_max: Maximum power in kW to consider when sizing
+            unitary_cost: Cost peer installed kW of the solar facility (€/kW)
+        """
         self.index = None
 
         self.nominal_power = None
@@ -32,14 +49,27 @@ class SolarFarm:
 
         self.max_power = solar_power_max
 
+        self.unitary_cost = unitary_cost
+
     def power(self):
+        """
+        Returns the generated power
+        Returns: Array
+        """
         return self.nominal_power * self.normalized_power
 
 
 class WindFarm:
 
-    def __init__(self, profile, wt_curve_df, wind_power_max=10000):
+    def __init__(self, profile, wt_curve_df, wind_power_max=10000, unitary_cost=1):
+        """
 
+        Args:
+            profile: Wind profile in m/s
+            wt_curve_df: Wind turbine power curve in a DataFrame (Power [any unit, values] vs. Wind speed [m/s, index])
+            wind_power_max: Maximum nominal power of the wind park considered when sizing
+            unitary_cost: Unitary cost of the wind park in €/kW
+        """
         self.index = None
 
         self.nominal_power = None
@@ -51,20 +81,29 @@ class WindFarm:
 
         self.max_power = wind_power_max
 
+        self.unitary_cost = unitary_cost
+
     def power(self):
+        """
+        Returns the generated power
+        Returns: Array
+        """
         return self.nominal_power * self.normalized_power
 
 
 class BatterySystem:
 
-    def __init__(self, charge_efficiency=0.9, discharge_efficiency=0.9, max_soc=0.99, min_soc=0.3, batery_energy_max=100000):
+    def __init__(self, charge_efficiency=0.9, discharge_efficiency=0.9, max_soc=0.99, min_soc=0.3,
+                 battery_energy_max=100000, unitary_cost=1):
         """
 
         Args:
-            charge_efficiency:
-            discharge_efficiency:
-            max_soc:
-            min_soc:
+            charge_efficiency: Efficiency when charging
+            discharge_efficiency:  Efficiency when discharging
+            max_soc: Maximum state of charge
+            min_soc: Minimum state of charge
+            battery_energy_max: Maximum energy in kWh allowed for sizing the battery
+            unitary_cost: Cost per kWh of the battery (€/kWh)
         """
 
         self.index = None
@@ -79,10 +118,11 @@ class BatterySystem:
 
         self.min_soc = min_soc
 
-        self.max_energy = batery_energy_max
+        self.max_energy = battery_energy_max
+
+        self.unitary_cost = unitary_cost
 
         self.results = None
-
 
     def simulate_array(self, P, soc_0, time):
         """
@@ -170,13 +210,13 @@ class MicroGrid:
 
     dim = 3  # 3 variables to optimize
 
-    def __init__(self, solar_farm:SolarFarm, wind_farm:WindFarm, demand_system:Demand, battery_system:BatterySystem,
-                 start=datetime(2016, 1, 1)):
+    def __init__(self, solar_farm: SolarFarm, wind_farm: WindFarm, demand_system: Demand, battery_system: BatterySystem,
+                 start=datetime(2016, 1, 1), LCOE_years=20):
 
-        # optimizator variables
+        # variables for the optimization
         self.xlow = np.zeros(self.dim)  # lower bounds
         self.xup = np.array([solar_farm.max_power, wind_farm.max_power, battery_system.max_energy])
-        self.info = "Our own " + str(self.dim) + "-dimensional function"  # info
+        self.info = "Microgrid with Wind turbines, Photovoltaic panels and storage coupled to a demand"  # info
         self.integer = np.array([0])  # integer variables
         self.continuous = np.arange(1, self.dim)  # continuous variables
 
@@ -192,6 +232,9 @@ class MicroGrid:
         # create a time index matching the length
         nt = len(wind_speed_profile)
         self.time = [start + timedelta(hours=h) for h in range(nt)]
+
+        # economic variables
+        self.lcoe_years = LCOE_years
 
         # Results
 
@@ -213,6 +256,14 @@ class MicroGrid:
         self.optimization_values = None
 
     def __call__(self, x):
+        """
+        Call for this object, performs the dispatch given a vector x of facility sizes
+        Args:
+            x: vector [solar nominal power, wind nominal power, storage nominal power]
+
+        Returns: Value of the objective function for the given x vector
+
+        """
         return self.objfunction(x)
 
     def objfunction(self, x):
@@ -224,9 +275,9 @@ class MicroGrid:
         Returns:
 
         """
-        ###############################################################################
+        ################################################################################################################
         # Set the devices nominal power
-        ###############################################################################
+        ################################################################################################################
         self.solar_farm.nominal_power = x[0]
 
         self.wind_farm.nominal_power = x[1]
@@ -240,15 +291,15 @@ class MicroGrid:
             generation: positive
         '''
 
-        ###############################################################################
+        ################################################################################################################
         # Compute the battery desired profile
-        ###############################################################################
+        ################################################################################################################
 
         self.aggregated_demand_profile = self.demand_system.power() + self.wind_farm.power() + self.solar_farm.power()
 
-        ###############################################################################
+        ################################################################################################################
         # Compute the battery real profile: processing the desired profile
-        ###############################################################################
+        ################################################################################################################
 
         '''
         The storage signs are the following
@@ -284,6 +335,11 @@ class MicroGrid:
         return sum(abs(self.grid_power))
 
     def plot(self):
+        """
+        Plot the dispatch values
+        Returns:
+
+        """
         # plot results
         plot_cols = 3
         plot_rows = 2
@@ -295,31 +351,37 @@ class MicroGrid:
         plt.plot(self.demand_system.power(), label="Demand Power")
         plt.plot(self.solar_farm.power(), label="Photovoltaic Power")
         plt.plot(self.wind_farm.power(), label="Wind Power")
+        plt.ylabel('kW')
         plt.legend()
 
         plt.subplot(plot_rows, plot_cols, 2)
         plt.plot(self.aggregated_demand_profile, label="Aggregated power profile")
         plt.plot(np.zeros(steps_number), 'k')
+        plt.ylabel('kW')
         plt.legend()
 
         plt.subplot(plot_rows, plot_cols, 3)
         plt.plot(- self.aggregated_demand_profile, label="Power demanded to the battery")
         plt.plot(np.zeros(steps_number), 'k')
+        plt.ylabel('kW')
         plt.legend()
 
         plt.subplot(plot_rows, plot_cols, 4)
         plt.plot(self.grid_power, label="Power demanded to the grid")
         plt.plot(np.zeros(steps_number), 'k')
+        plt.ylabel('kW')
         plt.legend()
 
         plt.subplot(plot_rows, plot_cols, 5)
         plt.plot(self.battery_output_power, label="Battery power")
         plt.plot(np.zeros(steps_number), 'k')
+        plt.ylabel('kW')
         plt.legend()
 
         plt.subplot(plot_rows, plot_cols, 6)
         plt.plot(self.battery_state_of_charge, label="Battery SoC")
         plt.plot(np.zeros(steps_number), 'k')
+        plt.ylabel('Per unit')
         plt.legend()
 
     def optimize(self, maxeval=1000):
@@ -376,11 +438,12 @@ class MicroGrid:
 
         """
         if self.optimization_values is not None:
-            maxeval = len(self.optimization_values)
+            max_eval = len(self.optimization_values)
             f, ax = plt.subplots()
-            ax.plot(np.arange(0, maxeval), self.optimization_values, 'bo')  # Points
-            ax.plot(np.arange(0, maxeval), np.minimum.accumulate(self.optimization_values), 'r-',
-                    linewidth=3.0)  # Best value found
+            # Points
+            ax.plot(np.arange(0, max_eval), self.optimization_values, 'bo')
+            # Best value found
+            ax.plot(np.arange(0, max_eval), np.minimum.accumulate(self.optimization_values), 'r-', linewidth=3.0)
             plt.xlabel('Evaluations')
             plt.ylabel('Function Value')
             plt.title('Optimization convergence')
@@ -389,6 +452,8 @@ if __name__ == '__main__':
 
     # Create devices
     fname = 'data.xls'
+
+    prices = pd.read_excel(fname, sheetname='prices')[['Secondary_reg_price', 'Spot_price']].values
 
     # load the solar irradiation in W/M2 and convert it to kW
     solar_radiation_profile = pd.read_excel(fname, sheetname='radiacion')['Radiación (MW/m2)'].values
@@ -421,7 +486,6 @@ if __name__ == '__main__':
                            demand_system=desalination_plant,
                            start=datetime(2016, 1, 1))
     res_x = micro_grid.optimize(maxeval=500)
-    # res_x = [500, 600, 10000]
     res = micro_grid(res_x)
     micro_grid.plot()
     micro_grid.plot_optimization()
