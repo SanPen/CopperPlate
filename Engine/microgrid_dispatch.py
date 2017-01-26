@@ -33,7 +33,7 @@ class Demand:
 
 class SolarFarm:
 
-    def __init__(self, profile, solar_power_max=10000, unitary_cost=1):
+    def __init__(self, profile, solar_power_max=10000, unitary_cost=200):
         """
 
         Args:
@@ -58,10 +58,13 @@ class SolarFarm:
         """
         return self.nominal_power * self.normalized_power
 
+    def cost(self):
+        return self.unitary_cost * self.nominal_power
+
 
 class WindFarm:
 
-    def __init__(self, profile, wt_curve_df, wind_power_max=10000, unitary_cost=1):
+    def __init__(self, profile, wt_curve_df, wind_power_max=10000, unitary_cost=900):
         """
 
         Args:
@@ -69,6 +72,10 @@ class WindFarm:
             wt_curve_df: Wind turbine power curve in a DataFrame (Power [any unit, values] vs. Wind speed [m/s, index])
             wind_power_max: Maximum nominal power of the wind park considered when sizing
             unitary_cost: Unitary cost of the wind park in €/kW
+
+            Example of unitary cost:
+            A wind park with 4 turbines of 660 kW cost 2 400 000 €
+            2400000 / (4 * 660) = 909 €/kW installed
         """
         self.index = None
 
@@ -90,11 +97,20 @@ class WindFarm:
         """
         return self.nominal_power * self.normalized_power
 
+    def cost(self):
+        return self.unitary_cost * self.nominal_power
+
 
 class BatterySystem:
+    demanded_power = None
+    energy = None
+    power = None
+    grid_power = None
+    soc = None
+    time = None
 
     def __init__(self, charge_efficiency=0.9, discharge_efficiency=0.9, max_soc=0.99, min_soc=0.3,
-                 battery_energy_max=100000, unitary_cost=1):
+                 battery_energy_max=100000, unitary_cost=900):
         """
 
         Args:
@@ -127,6 +143,9 @@ class BatterySystem:
         self.unitary_cost = unitary_cost
 
         self.results = None
+
+    def cost(self):
+        return self.unitary_cost * self.nominal_energy
 
     def simulate_array(self, P, soc_0, time, charge_if_needed=False):
         """
@@ -213,11 +232,33 @@ class BatterySystem:
             soc[t + 1] = energy[t + 1] / self.nominal_energy
 
         # Compose a results DataFrame
-        d = np.c_[np.r_[0, P[:-1]], power[:-1], grid_power[:-1], energy[:-1], soc[:-1] * 100]
-        cols = ['P request', 'P', 'grid', 'E', 'SoC']
-        self.results = pd.DataFrame(data=d, columns=cols)
+        self.demanded_power = np.r_[0, P[:-1]]
+        self.energy = energy[:-1]
+        self.power = power[:-1]
+        self.grid_power = grid_power[:-1]
+        self.soc = soc[:-1]
+        self.time = time
+
+        # d = np.c_[np.r_[0, P[:-1]], power[:-1], grid_power[:-1], energy[:-1], soc[:-1] * 100]
+        # cols = ['P request', 'P', 'grid', 'E', 'SoC']
+        # self.results = pd.DataFrame(data=d, columns=cols)
 
         return energy[:-1], power[:-1], grid_power[:-1], soc[:-1]
+
+    def plot(self):
+
+        fig = plt.figure(figsize=(12, 8))
+        ax1 = fig.add_subplot(111)
+        ax1.stackplot(self.time, self.power, self.grid_power)
+        ax1.plot(self.time, self.demanded_power, linewidth=4)
+        ax1.set_ylabel('kW')
+
+        ax2 = ax1.twinx()
+        ax2.plot(self.time, self.soc, color='k')
+        ax2.set_ylabel('SoC')
+
+        ax1.legend()
+        plt.show()
 
 
 class MicroGrid:
@@ -225,7 +266,7 @@ class MicroGrid:
     dim = 3  # 3 variables to optimize
 
     def __init__(self, solar_farm: SolarFarm, wind_farm: WindFarm, demand_system: Demand, battery_system: BatterySystem,
-                 start=datetime(2016, 1, 1), LCOE_years=20):
+                 start=datetime(2016, 1, 1), LCOE_years=20, spot_price=None, band_price=None):
 
         # variables for the optimization
         self.xlow = np.zeros(self.dim)  # lower bounds
@@ -242,6 +283,10 @@ class MicroGrid:
         self.demand_system = demand_system
 
         self.battery_system = battery_system
+
+        self.spot_price = spot_price
+
+        self.band_price = band_price
 
         # create a time index matching the length
         nt = len(wind_speed_profile)
@@ -269,7 +314,9 @@ class MicroGrid:
 
         self.optimization_values = None
 
-    def __call__(self, x):
+        self.x_fx = list()
+
+    def __call__(self, x, verbose=False):
         """
         Call for this object, performs the dispatch given a vector x of facility sizes
         Args:
@@ -278,9 +325,9 @@ class MicroGrid:
         Returns: Value of the objective function for the given x vector
 
         """
-        return self.objfunction(x)
+        return self.objfunction(x, verbose)
 
-    def objfunction(self, x):
+    def objfunction(self, x, verbose=False):
         """
 
         Args:
@@ -337,7 +384,7 @@ class MicroGrid:
         # energy, power, grid_power, soc
         self.Energy, \
         self.battery_output_power, \
-        grid_power, \
+        self.grid_power, \
         self.battery_state_of_charge = self.battery_system.simulate_array(P=demanded_power, soc_0=SoC0,
                                                                           time=self.time, charge_if_needed=True)
 
@@ -345,9 +392,100 @@ class MicroGrid:
 
         # calculate the grid power as the difference of the battery power
         # and the profile required for perfect auto-consumption
-        self.grid_power = demanded_power - self.battery_output_power
+        # self.grid_power = demanded_power - self.battery_output_power
 
-        return sum(abs(self.grid_power))
+        # compute the investment cost
+        investment_cost = self.solar_farm.cost() + self.wind_farm.cost() + self.battery_system.cost()
+
+        # compute the LCOE Levelized Cost Of Electricity
+        lcoe_val = self.lcoe(generated_power_profile=self.grid_power, investment_cost=investment_cost,
+                             discount_rate=0.03, verbose=verbose)
+
+        fx = sum(abs(self.grid_power))
+
+        self.x_fx.append([fx] + list(x) + [lcoe_val])
+
+        return fx
+
+        # return lcoe_val
+
+    def lcoe(self, generated_power_profile, investment_cost, discount_rate, verbose=False):
+
+        grid_energy = generated_power_profile.sum()
+        energy_cost = (generated_power_profile * self.spot_price).sum()
+
+        # build the arrays for the n years
+        I = np.zeros(self.lcoe_years)  # investment
+        I[0] = investment_cost
+        E = np.ones(self.lcoe_years) * grid_energy  # gains/cost of electricity
+        M = np.ones(self.lcoe_years) * investment_cost * 0.1  # cost of maintainance
+
+        dr = np.array([(1 + discount_rate)**(i+1) for i in range(self.lcoe_years)])
+        A = (I + M / dr).sum()
+        B = (E / dr).sum()
+
+        if verbose:
+            print('Grid energy', grid_energy, 'kWh')
+            print('Energy cost', energy_cost, '€')
+            print('investment_cost', investment_cost, '€')
+            print('dr', dr)
+            print('A:', A, 'B:', B)
+            print('lcoe_val', A/B)
+
+        return A / B
+
+    def optimize(self, maxeval=1000):
+        """
+        Function that optimizes a MicroGrid Object
+        Args:
+
+        Returns:
+
+        """
+        self.x_fx = list()
+        # (1) Optimization problem
+        # print(data.info)
+
+        # (2) Experimental design
+        # Use a symmetric Latin hypercube with 2d + 1 samples
+        exp_des = SymmetricLatinHypercube(dim=self.dim, npts=2 * self.dim + 1)
+
+        # (3) Surrogate model
+        # Use a cubic RBF interpolant with a linear tail
+        surrogate = RBFInterpolant(kernel=CubicKernel, tail=LinearTail, maxp=maxeval)
+
+        # (4) Adaptive sampling
+        # Use DYCORS with 100d candidate points
+        adapt_samp = CandidateDYCORS(data=self, numcand=100 * self.dim)
+
+        # Use the serial controller (uses only one thread)
+        controller = SerialController(self.objfunction)
+
+        # (5) Use the sychronous strategy without non-bound constraints
+        strategy = SyncStrategyNoConstraints(
+            worker_id=0, data=self, maxeval=maxeval, nsamples=1,
+            exp_design=exp_des, response_surface=surrogate,
+            sampling_method=adapt_samp)
+        controller.strategy = strategy
+
+        # Run the optimization strategy
+        result = controller.run()
+
+        # Print the final result
+        print('Best value found: {0}'.format(result.value))
+        print('Best solution found: {0}'.format(
+            np.array_str(result.params[0], max_line_width=np.inf,
+                         precision=5, suppress_small=True)))
+
+        # Extract function values from the controller
+        self.optimization_values = np.array([o.value for o in controller.fevals])
+
+        # turn the results into a DataFrame
+        self.x_fx = np.array(self.x_fx)
+        self.x_fx = pd.DataFrame(data=self.x_fx[:, 1:], index=self.x_fx[:, 0], columns=['Solar', 'Wind', 'Battery', 'LCOE'])
+        self.x_fx.sort_index(inplace=True)
+
+        return result.params[0]
 
     def plot(self):
         """
@@ -399,53 +537,6 @@ class MicroGrid:
         plt.ylabel('Per unit')
         plt.legend()
 
-    def optimize(self, maxeval=1000):
-        """
-        Function that optimizes a MicroGrid Object
-        Args:
-
-        Returns:
-
-        """
-        # (1) Optimization problem
-        # print(data.info)
-
-        # (2) Experimental design
-        # Use a symmetric Latin hypercube with 2d + 1 samples
-        exp_des = SymmetricLatinHypercube(dim=self.dim, npts=2 * self.dim + 1)
-
-        # (3) Surrogate model
-        # Use a cubic RBF interpolant with a linear tail
-        surrogate = RBFInterpolant(kernel=CubicKernel, tail=LinearTail, maxp=maxeval)
-
-        # (4) Adaptive sampling
-        # Use DYCORS with 100d candidate points
-        adapt_samp = CandidateDYCORS(data=self, numcand=100 * self.dim)
-
-        # Use the serial controller (uses only one thread)
-        controller = SerialController(self.objfunction)
-
-        # (5) Use the sychronous strategy without non-bound constraints
-        strategy = SyncStrategyNoConstraints(
-            worker_id=0, data=self, maxeval=maxeval, nsamples=1,
-            exp_design=exp_des, response_surface=surrogate,
-            sampling_method=adapt_samp)
-        controller.strategy = strategy
-
-        # Run the optimization strategy
-        result = controller.run()
-
-        # Print the final result
-        print('Best value found: {0}'.format(result.value))
-        print('Best solution found: {0}'.format(
-            np.array_str(result.params[0], max_line_width=np.inf,
-                         precision=5, suppress_small=True)))
-
-        # Extract function values from the controller
-        self.optimization_values = np.array([o.value for o in controller.fevals])
-
-        return result.params[0]
-
     def plot_optimization(self):
         """
         Plot the optimization convergence
@@ -495,34 +586,29 @@ if __name__ == '__main__':
     battery = BatterySystem()
 
     # Create a MicroGrid with the given devices
+    # Divide the prices by thousand because they represent €/MWh and we need €/kWh
     micro_grid = MicroGrid(solar_farm=solar_farm,
                            wind_farm=wind_farm,
                            battery_system=battery,
                            demand_system=desalination_plant,
-                           start=datetime(2016, 1, 1))
-    res_x = micro_grid.optimize(maxeval=5000)
-    res = micro_grid(res_x)
+                           start=datetime(2016, 1, 1),
+                           LCOE_years=20,
+                           spot_price=prices[:, 0] / 1000,
+                           band_price=prices[:, 1] / 1000)
+    res_x = micro_grid.optimize(maxeval=100)
+    res = micro_grid(res_x, verbose=True)
+    micro_grid.x_fx.to_excel('results.xlsx')
+    # print(micro_grid.x_fx)
+
     micro_grid.plot()
     micro_grid.plot_optimization()
+
+    battery.plot()
+
+
 
     plt.show()
 
     # print(res)
 
-    # battery = Battery(nominal_energy=200, charge_efficiency=1.0, discharge_efficiency=1.0, max_soc=1.0, min_soc=0.3)
-    #
-    # vals = [100, -25, -10, 30, -200, 50, 10]
-    #
-    # start = datetime(2016, 1, 1)
-    # nt = len(vals)
-    # idx = [start + timedelta(hours=h) for h in range(nt)]
-    #
-    # cols = ['P']
-    # data = pd.DataFrame(data=vals, index=idx, columns=cols)
-    #
-    # battery.simulate_array(P=vals, soc_0=0.5, time=data.index)
-    #
-    # print(battery.results)
-    #
-    # battery.results.plot()
-    # plt.show()
+
