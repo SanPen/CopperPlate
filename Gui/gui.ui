@@ -351,11 +351,7 @@
    </palette>
   </property>
   <property name="windowTitle">
-   <string>GridCal</string>
-  </property>
-  <property name="windowIcon">
-   <iconset>
-    <normaloff>:/Program/GridCal_icon.svg</normaloff>:/Program/GridCal_icon.svg</iconset>
+   <string>CopperPlate</string>
   </property>
   <property name="iconSize">
    <size>

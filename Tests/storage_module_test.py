@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
-
 import pandas as pd
 from matplotlib import pyplot as plt
-
 from Engine.microgrid_dispatch import BatterySystem
 
 battery = BatterySystem(charge_efficiency=1.0, discharge_efficiency=1.0, max_soc=1.0, min_soc=0.3)

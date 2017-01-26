@@ -123,9 +123,6 @@ class Ui_mainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         mainWindow.setPalette(palette)
-        icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/Program/GridCal_icon.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        mainWindow.setWindowIcon(icon)
         mainWindow.setIconSize(QtCore.QSize(24, 24))
         mainWindow.setDocumentMode(False)
         mainWindow.setTabShape(QtWidgets.QTabWidget.Rounded)
@@ -326,9 +323,9 @@ class Ui_mainWindow(object):
         self.inputsPlot = MatplotlibWidget(self.splitter)
         self.inputsPlot.setObjectName("inputsPlot")
         self.horizontalLayout.addWidget(self.splitter)
-        icon1 = QtGui.QIcon()
-        icon1.addPixmap(QtGui.QPixmap(":/file/ic_insert_chart_black_48dp.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        self.tabWidget.addTab(self.InputTab, icon1, "")
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(":/file/ic_insert_chart_black_48dp.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.tabWidget.addTab(self.InputTab, icon, "")
         self.SimulationTab = QtWidgets.QWidget()
         self.SimulationTab.setObjectName("SimulationTab")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.SimulationTab)
@@ -388,7 +385,7 @@ class Ui_mainWindow(object):
 
     def retranslateUi(self, mainWindow):
         _translate = QtCore.QCoreApplication.translate
-        mainWindow.setWindowTitle(_translate("mainWindow", "GridCal"))
+        mainWindow.setWindowTitle(_translate("mainWindow", "CopperPlate"))
         self.groupBox.setTitle(_translate("mainWindow", "Demand"))
         self.label_3.setText(_translate("mainWindow", "kW"))
         self.label_2.setText(_translate("mainWindow", "Nominal power"))
