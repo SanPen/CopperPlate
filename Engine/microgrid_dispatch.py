@@ -266,7 +266,7 @@ class MicroGrid:
     dim = 3  # 3 variables to optimize
 
     def __init__(self, solar_farm: SolarFarm, wind_farm: WindFarm, demand_system: Demand, battery_system: BatterySystem,
-                 start=datetime(2016, 1, 1), LCOE_years=20, spot_price=None, band_price=None):
+                 time_arr, LCOE_years=20, investment_rate=0.03, spot_price=None, band_price=None):
 
         # variables for the optimization
         self.xlow = np.zeros(self.dim)  # lower bounds
@@ -289,11 +289,12 @@ class MicroGrid:
         self.band_price = band_price
 
         # create a time index matching the length
-        nt = len(wind_speed_profile)
-        self.time = [start + timedelta(hours=h) for h in range(nt)]
+        self.time = time_arr
 
         # economic variables
         self.lcoe_years = LCOE_years
+
+        self.investment_rate = investment_rate
 
         # Results
 
@@ -399,7 +400,7 @@ class MicroGrid:
 
         # compute the LCOE Levelized Cost Of Electricity
         lcoe_val = self.lcoe(generated_power_profile=self.grid_power, investment_cost=investment_cost,
-                             discount_rate=0.03, verbose=verbose)
+                             discount_rate=self.investment_rate, verbose=verbose)
 
         fx = sum(abs(self.grid_power))
 
@@ -562,22 +563,22 @@ if __name__ == '__main__':
     prices = pd.read_excel(fname, sheetname='prices')[['Secondary_reg_price', 'Spot_price']].values
 
     # load the solar irradiation in W/M2 and convert it to kW
-    solar_radiation_profile = pd.read_excel(fname, sheetname='radiacion')['Radiación (MW/m2)'].values
+    solar_radiation_profile = pd.read_excel(fname, sheetname='irradiation')['irradiation (MW/m2)'].values
 
     #  create the solar farm object
     solar_farm = SolarFarm(solar_radiation_profile)
 
     # Load the wind speed in m/s
-    wind_speed_profile = pd.read_excel(fname, sheetname='viento')['VEL(m/s):60'].values
+    wind_speed_profile = pd.read_excel(fname, sheetname='wind')['VEL(m/s):60'].values
 
     # load the wind turbine power curve and normalize it
-    ag_curve_df = pd.read_excel(fname, sheetname='AG_CAT')['P (MW)']
+    ag_curve_df = pd.read_excel(fname, sheetname='AG_CAT')['P (kW)']
 
     # create the wind farm object
     wind_farm = WindFarm(wind_speed_profile, ag_curve_df)
 
     # load the demand values and set it negative for the sign convention
-    demand_profile = pd.read_excel(fname, sheetname='desaladora')['Demanda normalizada'].values
+    demand_profile = pd.read_excel(fname, sheetname='demand')['normalized_demand'].values
 
     # Create the demand facility
     desalination_plant = Demand(demand_profile, nominal_power=1000)
@@ -585,13 +586,16 @@ if __name__ == '__main__':
     # Create a Battery system
     battery = BatterySystem()
 
+    nt = len(wind_speed_profile)
+    time = [datetime(2016, 1, 1) + timedelta(hours=h) for h in range(nt)]
+
     # Create a MicroGrid with the given devices
     # Divide the prices by thousand because they represent €/MWh and we need €/kWh
     micro_grid = MicroGrid(solar_farm=solar_farm,
                            wind_farm=wind_farm,
                            battery_system=battery,
                            demand_system=desalination_plant,
-                           start=datetime(2016, 1, 1),
+                           time_arr=time,
                            LCOE_years=20,
                            spot_price=prices[:, 0] / 1000,
                            band_price=prices[:, 1] / 1000)

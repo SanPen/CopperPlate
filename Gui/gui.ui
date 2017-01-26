@@ -439,6 +439,20 @@
                        </property>
                       </widget>
                      </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label">
+                       <property name="text">
+                        <string>Start date</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="2">
+                      <widget class="QLabel" name="label_24">
+                       <property name="text">
+                        <string>Investment years</string>
+                       </property>
+                      </widget>
+                     </item>
                      <item row="0" column="0">
                       <widget class="QLabel" name="label_2">
                        <property name="text">
@@ -447,12 +461,40 @@
                       </widget>
                      </item>
                      <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="demand_nominal_power_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="demand_nominal_power_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.990000009536743</double>
+                       </property>
+                      </widget>
                      </item>
-                     <item row="1" column="0">
+                     <item row="3" column="0">
                       <widget class="QPushButton" name="demand_show_profile_pushButton">
                        <property name="text">
                         <string>Show profile</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QDateEdit" name="start_dateEdit">
+                       <property name="displayFormat">
+                        <string>dd/MM/yyyy</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="3">
+                      <widget class="QSpinBox" name="investment_years_spinBox"/>
+                     </item>
+                     <item row="2" column="2">
+                      <widget class="QLabel" name="label_25">
+                       <property name="text">
+                        <string>Interest rate</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="3">
+                      <widget class="QDoubleSpinBox" name="interest_rate_doubleSpinBox">
+                       <property name="maximum">
+                        <double>1.000000000000000</double>
                        </property>
                       </widget>
                      </item>
@@ -484,7 +526,11 @@
                       </widget>
                      </item>
                      <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="wind_farm_nominal_power_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="wind_farm_nominal_power_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="0" column="0">
                       <widget class="QLabel" name="label_5">
@@ -515,7 +561,11 @@
                       </widget>
                      </item>
                      <item row="1" column="1">
-                      <widget class="QDoubleSpinBox" name="wind_farm_unitary_cost_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="wind_farm_unitary_cost_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="2" column="1">
                       <widget class="QPushButton" name="wind_turbine_show_curve_pushButton">
@@ -566,10 +616,18 @@
                       </widget>
                      </item>
                      <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="solar_farm_nominal_power_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="solar_farm_nominal_power_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="1" column="1">
-                      <widget class="QDoubleSpinBox" name="solar_farm_unitary_cost_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="solar_farm_unitary_cost_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="1" column="0">
                       <widget class="QLabel" name="label_13">
@@ -620,7 +678,11 @@
                       </widget>
                      </item>
                      <item row="0" column="4">
-                      <widget class="QDoubleSpinBox" name="storage_max_unitary_cost_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="storage_max_unitary_cost_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="1" column="3">
                       <widget class="QLabel" name="label_17">
@@ -644,7 +706,11 @@
                       </widget>
                      </item>
                      <item row="1" column="1">
-                      <widget class="QDoubleSpinBox" name="storage_min_soc_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="storage_min_soc_doubleSpinBox">
+                       <property name="maximum">
+                        <double>1.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="2" column="3">
                       <widget class="QLabel" name="label_22">
@@ -654,7 +720,11 @@
                       </widget>
                      </item>
                      <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="storage_max_nominal_energy_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="storage_max_nominal_energy_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="0" column="5">
                       <widget class="QLabel" name="label_15">
@@ -664,10 +734,18 @@
                       </widget>
                      </item>
                      <item row="2" column="1">
-                      <widget class="QDoubleSpinBox" name="storage_charge_eff_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="storage_charge_eff_doubleSpinBox">
+                       <property name="maximum">
+                        <double>1.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="1" column="4">
-                      <widget class="QDoubleSpinBox" name="storage_max_soc_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="storage_max_soc_doubleSpinBox">
+                       <property name="maximum">
+                        <double>1.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="2" column="0">
                       <widget class="QLabel" name="label_20">
@@ -677,7 +755,11 @@
                       </widget>
                      </item>
                      <item row="2" column="4">
-                      <widget class="QDoubleSpinBox" name="storage_discharge_eff_doubleSpinBox"/>
+                      <widget class="QDoubleSpinBox" name="storage_discharge_eff_doubleSpinBox">
+                       <property name="maximum">
+                        <double>1.000000000000000</double>
+                       </property>
+                      </widget>
                      </item>
                      <item row="2" column="2">
                       <widget class="QLabel" name="label_21">
