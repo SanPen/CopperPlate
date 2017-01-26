@@ -245,9 +245,10 @@ class BatterySystem:
 
         return energy[:-1], power[:-1], grid_power[:-1], soc[:-1]
 
-    def plot(self):
+    def plot(self, fig=None):
 
-        fig = plt.figure(figsize=(12, 8))
+        if fig is None:
+            fig = plt.figure(figsize=(12, 8))
         ax1 = fig.add_subplot(111)
         ax1.stackplot(self.time, self.power, self.grid_power)
         ax1.plot(self.time, self.demanded_power, linewidth=4)
@@ -314,6 +315,13 @@ class MicroGrid:
         self.battery_state_of_charge = None
 
         self.optimization_values = None
+
+        self.solution = None
+
+        self.grid_energy = None
+        self.energy_cost = None
+        self.investment_cost = None
+        self.lcoe_val = None
 
         self.x_fx = list()
 
@@ -433,7 +441,12 @@ class MicroGrid:
             print('A:', A, 'B:', B)
             print('lcoe_val', A/B)
 
-        return A / B
+        self.grid_energy = grid_energy
+        self.energy_cost = energy_cost
+        self.investment_cost = investment_cost
+        self.lcoe_val = A / B
+
+        return self.lcoe_val
 
     def optimize(self, maxeval=1000):
         """
@@ -477,6 +490,7 @@ class MicroGrid:
         print('Best solution found: {0}'.format(
             np.array_str(result.params[0], max_line_width=np.inf,
                          precision=5, suppress_small=True)))
+        self.solution = result.params[0]
 
         # Extract function values from the controller
         self.optimization_values = np.array([o.value for o in controller.fevals])
@@ -538,7 +552,7 @@ class MicroGrid:
         plt.ylabel('Per unit')
         plt.legend()
 
-    def plot_optimization(self):
+    def plot_optimization(self, ax = None):
         """
         Plot the optimization convergence
         Returns:
@@ -546,14 +560,16 @@ class MicroGrid:
         """
         if self.optimization_values is not None:
             max_eval = len(self.optimization_values)
-            f, ax = plt.subplots()
+
+            if ax is None:
+                f, ax = plt.subplots()
             # Points
             ax.plot(np.arange(0, max_eval), self.optimization_values, 'bo')
             # Best value found
             ax.plot(np.arange(0, max_eval), np.minimum.accumulate(self.optimization_values), 'r-', linewidth=3.0)
-            plt.xlabel('Evaluations')
-            plt.ylabel('Function Value')
-            plt.title('Optimization convergence')
+            ax.set_xlabel('Evaluations')
+            ax.set_ylabel('Function Value')
+            ax.set_title('Optimization convergence')
 
 if __name__ == '__main__':
 

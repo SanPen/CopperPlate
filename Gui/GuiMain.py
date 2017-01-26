@@ -56,6 +56,8 @@ class MainGUI(QMainWindow):
 
     time = None
 
+    micro_grid = None
+
     #
     project_directory = None
 
@@ -69,6 +71,16 @@ class MainGUI(QMainWindow):
         QWidget.__init__(self, parent)
         self.ui = Ui_mainWindow()
         self.ui.setupUi(self)
+
+        self.available_results = list()
+        self.available_results.append('Optimization plot')
+        self.available_results.append('Storage power')
+        self.available_results.append('Aggregated power profile')
+        self.available_results.append('Power to the battery')
+        self.available_results.append('Power demanded to the grid')
+        self.available_results.append('Battery power effectively processed')
+        self.available_results.append('Battery state of charge')
+        self.ui.results_comboBox.addItems(self.available_results)
 
         ################################################################################################################
         # Connections
@@ -90,36 +102,8 @@ class MainGUI(QMainWindow):
         self.ui.wind_turbine_show_curve_pushButton.clicked.connect(self.plot_ag_curve)
 
         self.ui.size_simulate_pushButton.clicked.connect(self.size_devices)
-        #
-        # self.ui.profile_display_pushButton.clicked.connect(self.display_profiles)
-        #
-        # self.ui.plot_pushButton.clicked.connect(self.item_results_plot)
-        #
-        # self.ui.select_all_pushButton.clicked.connect(self.ckeck_all_result_objects)
-        #
-        # self.ui.select_none_pushButton.clicked.connect(self.ckeck_none_result_objects)
-        #
-        # self.ui.saveResultsButton.clicked.connect(self.save_results_df)
-        #
-        # self.ui.set_profile_state_button.clicked.connect(self.set_state)
-        #
-        # self.ui.setValueToColumnButton.clicked.connect(self.set_value_to_column)
-        #
-        # # node size
-        # self.ui.actionBigger_nodes.triggered.connect(self.grid_editor.bigger_nodes)
-        #
-        # self.ui.actionSmaller_nodes.triggered.connect(self.grid_editor.smaller_nodes)
-        #
-        # self.ui.actionCenter_view.triggered.connect(self.grid_editor.center_nodes)
-        #
-        # # list clicks
-        # self.ui.result_listView.clicked.connect(self.update_available_results_in_the_study)
-        # self.ui.result_type_listView.clicked.connect(self.result_type_click)
-        #
-        # self.ui.dataStructuresListView.clicked.connect(self.view_objects_data)
-        #
-        # # combobox
-        # self.ui.profile_device_type_comboBox.currentTextChanged.connect(self.profile_device_type_changed)
+
+        self.ui.plot_results_pushButton.clicked.connect(self.plot_results)
 
         self.set_default_ui_values()
 
@@ -151,7 +135,10 @@ class MainGUI(QMainWindow):
         self.ui.storage_discharge_eff_doubleSpinBox.setValue(0.8)
 
     def make_simulation_object(self):
+        """
 
+        :return:
+        """
         nominal_power = self.ui.demand_nominal_power_doubleSpinBox.value()
         start = self.ui.start_dateEdit.dateTime().toPyDateTime()
         investment_years = self.ui.investment_years_spinBox.value()
@@ -191,16 +178,14 @@ class MainGUI(QMainWindow):
         start = self.ui.start_dateEdit.dateTime().toPyDateTime()
         self.time = [start + timedelta(hours=h) for h in range(nt)]
 
-        micro_grid = MicroGrid(solar_farm=solar_farm,
-                               wind_farm=wind_farm,
-                               battery_system=battery,
-                               demand_system=demand,
-                               time_arr=self.time,
-                               LCOE_years=investment_years,
-                               spot_price=self.prices[:, 0] / 1000,
-                               band_price=self.prices[:, 1] / 1000)
-
-        return micro_grid
+        self.micro_grid = MicroGrid(solar_farm=solar_farm,
+                                    wind_farm=wind_farm,
+                                    battery_system=battery,
+                                    demand_system=demand,
+                                    time_arr=self.time,
+                                    LCOE_years=investment_years,
+                                    spot_price=self.prices[:, 0] / 1000,
+                                    band_price=self.prices[:, 1] / 1000)
 
     def new_project(self):
         print('new_project')
@@ -260,24 +245,127 @@ class MainGUI(QMainWindow):
 
                 self.msg('The file format is not right.')
 
+    def save_results(self):
+        """
+
+        :return:
+        """
+        if self.micro_grid is not None:
+            self.micro_grid.x_fx.to_excel('results.xlsx')
+
     def size_devices(self):
         """
 
         :return:
         """
         print('Working on it...')
-        micro_grid = self.make_simulation_object()
-        res_x = micro_grid.optimize(maxeval=100)
-        res = micro_grid(res_x, verbose=True)
-        micro_grid.x_fx.to_excel('results.xlsx')
+        # create a micro grid object
+        self.make_simulation_object()
+
+        # solve the sizing of devices
+        res_x = self.micro_grid.optimize(maxeval=100)
+
+        # set the solution as the current micro grid state
+        res = self.micro_grid(res_x, verbose=True)
+
         print('Done!')
 
-        micro_grid.plot()
-        micro_grid.plot_optimization()
+        # self.micro_grid.plot()
+        # plt.plot()
+        self.plot_text_results()
+        self.plot_results()
 
-        micro_grid.battery_system.plot()
+    def plot_text_results(self):
+        """
+        Print the test results
+        :return:
+        """
 
-        plt.plot()
+        self.ui.plainTextEdit.clear()
+
+        str = 'Results: \n\n'
+
+        str += 'Demand size:\t' + '{0:.2f}'.format(self.micro_grid.demand_system.nominal_power) + ' kW.\n'
+        str += 'Solar farm size:\t' + '{0:.2f}'.format(self.micro_grid.solution[0]) + ' kW.\n'
+        str += 'Wind farm size:\t' + '{0:.2f}'.format(self.micro_grid.solution[1]) + ' kW.\n'
+        str += 'Storage size:\t' + '{0:.2f}'.format(self.micro_grid.solution[2]) + ' kWh.\n'
+
+        str += '\n'
+
+        str += 'Solar farm cost:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.cost()) + ' €.\n'
+        str += 'Wind farm cost:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.cost()) + ' €.\n'
+        str += 'Storage cost:\t' + '{0:.2f}'.format(self.micro_grid.battery_system.cost()) + ' €.\n'
+
+        str += '\n'
+
+        str += 'Grid energy:\t' + '{0:.2f}'.format(self.micro_grid.grid_energy) + ' kWh.\n'
+        str += 'Energy cost:\t' + '{0:.2f}'.format(self.micro_grid.energy_cost) + ' €.\n'
+        str += 'investment_cost:\t' + '{0:.2f}'.format(self.micro_grid.investment_cost) + ' €.\n'
+        str += 'LCOE:\t\t' + '{0:.2f}'.format(self.micro_grid.lcoe_val) + ' €/kWh.\n'
+
+        self.ui.plainTextEdit.setPlainText(str)
+
+    def plot_results(self):
+        """
+        Plot the simulation results
+        :return:
+        """
+
+        if self.micro_grid is not None:
+
+            sel = self.ui.results_comboBox.currentText()
+            self.ui.resultsPlot.clear(force=True)
+            ax = self.ui.resultsPlot.get_axis()
+            fig = self.ui.resultsPlot.get_figure()
+
+            if sel == 'Optimization plot':
+
+                self.micro_grid.plot_optimization(ax=ax)
+
+            elif sel == 'Storage power':
+
+                self.micro_grid.battery_system.plot(fig=fig)
+
+            elif sel == 'Aggregated power profile':
+
+                ax.plot(self.micro_grid.aggregated_demand_profile, label=sel)
+                ax.set_ylabel('kW')
+                ax.set_title(sel)
+                ax.legend()
+
+            elif sel == 'Power to the battery':
+
+                ax.plot(self.micro_grid.battery_state_of_charge, label=sel)
+                ax.set_ylabel('kW')
+                ax.set_title(sel)
+                ax.legend()
+
+            elif sel == 'Power demanded to the grid':
+
+                ax.plot(self.micro_grid.grid_power, label=sel)
+                ax.set_ylabel('kW')
+                ax.set_title(sel)
+                ax.legend()
+
+            elif sel == 'Battery power effectively processed':
+
+                ax.plot(self.micro_grid.battery_state_of_charge, label=sel)
+                ax.set_ylabel('kW')
+                ax.set_title(sel)
+                ax.legend()
+
+            elif sel == 'Battery state of charge':
+
+                ax.plot(self.micro_grid.battery_state_of_charge, label=sel)
+                ax.set_ylabel('Per unit')
+                ax.set_title(sel)
+                ax.legend()
+
+            else:
+                print()
+
+            self.ui.resultsPlot.redraw()
+
 
     def plot_input(self, arr, ylabel='', xlabel='', title=''):
         """
