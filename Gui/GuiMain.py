@@ -105,7 +105,22 @@ class MainGUI(QMainWindow):
 
         self.ui.plot_results_pushButton.clicked.connect(self.plot_results)
 
+        ################################################################################################################
+        # Connections
+        ################################################################################################################
+
+        self.unlock()
+
         self.set_default_ui_values()
+
+    def set_ui_state(self, val=True):
+        self.ui.progress_frame.setVisible(val)
+
+    def lock(self):
+        self.set_ui_state(True)
+
+    def unlock(self):
+        self.set_ui_state(False)
 
     def set_default_ui_values(self):
         """
@@ -178,6 +193,8 @@ class MainGUI(QMainWindow):
         start = self.ui.start_dateEdit.dateTime().toPyDateTime()
         self.time = [start + timedelta(hours=h) for h in range(nt)]
 
+        max_eval = self.ui.max_eval_spinBox.value()
+
         self.micro_grid = MicroGrid(solar_farm=solar_farm,
                                     wind_farm=wind_farm,
                                     battery_system=battery,
@@ -185,7 +202,8 @@ class MainGUI(QMainWindow):
                                     time_arr=self.time,
                                     LCOE_years=investment_years,
                                     spot_price=self.prices[:, 0] / 1000,
-                                    band_price=self.prices[:, 1] / 1000)
+                                    band_price=self.prices[:, 1] / 1000,
+                                    maxeval=max_eval)
 
     def new_project(self):
         print('new_project')
@@ -262,11 +280,23 @@ class MainGUI(QMainWindow):
         # create a micro grid object
         self.make_simulation_object()
 
-        # solve the sizing of devices
-        res_x = self.micro_grid.optimize(maxeval=100)
+        self.lock()
 
+        # make connections
+        self.micro_grid.progress_signal.connect(self.ui.progressBar.setValue)
+        self.micro_grid.done_signal.connect(self.unlock)
+        self.micro_grid.done_signal.connect(self.post_size_devices)
+
+        # thread start
+        self.micro_grid.start()
+
+    def post_size_devices(self):
+        """
+        Actions to run after the optimization
+        :return:
+        """
         # set the solution as the current micro grid state
-        res = self.micro_grid(res_x, verbose=True)
+        res = self.micro_grid(self.micro_grid.solution, verbose=True)
 
         print('Done!')
 
@@ -274,6 +304,7 @@ class MainGUI(QMainWindow):
         # plt.plot()
         self.plot_text_results()
         self.plot_results()
+
 
     def plot_text_results(self):
         """

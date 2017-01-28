@@ -3,6 +3,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from datetime import datetime, timedelta
+from PyQt5.QtCore import QThread, QRunnable, pyqtSignal
 from pySOT import *
 from poap.controller import ThreadController, BasicWorkerThread, SerialController
 plt.style.use('ggplot')
@@ -262,12 +263,18 @@ class BatterySystem:
         plt.show()
 
 
-class MicroGrid:
+class MicroGrid(QThread):
+
+    progress_signal = pyqtSignal(float)
+    progress_text_signal = pyqtSignal(str)
+    done_signal = pyqtSignal()
 
     dim = 3  # 3 variables to optimize
 
     def __init__(self, solar_farm: SolarFarm, wind_farm: WindFarm, demand_system: Demand, battery_system: BatterySystem,
-                 time_arr, LCOE_years=20, investment_rate=0.03, spot_price=None, band_price=None):
+                 time_arr, LCOE_years=20, investment_rate=0.03, spot_price=None, band_price=None, maxeval=1000):
+
+        QThread.__init__(self)
 
         # variables for the optimization
         self.xlow = np.zeros(self.dim)  # lower bounds
@@ -313,6 +320,8 @@ class MicroGrid:
         self.battery_voltage = None
         self.battery_losses = None
         self.battery_state_of_charge = None
+        self.iteration = None
+        self.max_eval = maxeval
 
         self.optimization_values = None
 
@@ -414,6 +423,11 @@ class MicroGrid:
 
         self.x_fx.append([fx] + list(x) + [lcoe_val])
 
+        self.iteration += 1
+        prog = self.iteration / self.max_eval
+        print('progress:', prog)
+        self.progress_signal.emit(prog * 100)
+
         return fx
 
         # return lcoe_val
@@ -448,7 +462,10 @@ class MicroGrid:
 
         return self.lcoe_val
 
-    def optimize(self, maxeval=1000):
+    def optimize(self):
+        self.run()
+
+    def run(self):
         """
         Function that optimizes a MicroGrid Object
         Args:
@@ -456,7 +473,12 @@ class MicroGrid:
         Returns:
 
         """
+        self.iteration = 0
         self.x_fx = list()
+
+        self.progress_signal.emit(0)
+        self.progress_text_signal.emit('Optimizing facility sizes..')
+
         # (1) Optimization problem
         # print(data.info)
 
@@ -466,7 +488,7 @@ class MicroGrid:
 
         # (3) Surrogate model
         # Use a cubic RBF interpolant with a linear tail
-        surrogate = RBFInterpolant(kernel=CubicKernel, tail=LinearTail, maxp=maxeval)
+        surrogate = RBFInterpolant(kernel=CubicKernel, tail=LinearTail, maxp=self.max_eval)
 
         # (4) Adaptive sampling
         # Use DYCORS with 100d candidate points
@@ -477,7 +499,7 @@ class MicroGrid:
 
         # (5) Use the sychronous strategy without non-bound constraints
         strategy = SyncStrategyNoConstraints(
-            worker_id=0, data=self, maxeval=maxeval, nsamples=1,
+            worker_id=0, data=self, maxeval=self.max_eval, nsamples=1,
             exp_design=exp_des, response_surface=surrogate,
             sampling_method=adapt_samp)
         controller.strategy = strategy
@@ -500,7 +522,9 @@ class MicroGrid:
         self.x_fx = pd.DataFrame(data=self.x_fx[:, 1:], index=self.x_fx[:, 0], columns=['Solar', 'Wind', 'Battery', 'LCOE'])
         self.x_fx.sort_index(inplace=True)
 
-        return result.params[0]
+        self.progress_text_signal.emit('Done!')
+        self.done_signal.emit()
+
 
     def plot(self):
         """
@@ -614,9 +638,10 @@ if __name__ == '__main__':
                            time_arr=time,
                            LCOE_years=20,
                            spot_price=prices[:, 0] / 1000,
-                           band_price=prices[:, 1] / 1000)
-    res_x = micro_grid.optimize(maxeval=100)
-    res = micro_grid(res_x, verbose=True)
+                           band_price=prices[:, 1] / 1000,
+                           maxeval=100)
+    micro_grid.optimize()
+    res = micro_grid(micro_grid.solution, verbose=True)
     micro_grid.x_fx.to_excel('results.xlsx')
     # print(micro_grid.x_fx)
 
