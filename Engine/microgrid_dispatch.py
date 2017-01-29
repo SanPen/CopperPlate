@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from enum import Enum
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from datetime import datetime, timedelta
@@ -7,6 +8,13 @@ from PyQt5.QtCore import QThread, QRunnable, pyqtSignal
 from pySOT import *
 from poap.controller import ThreadController, BasicWorkerThread, SerialController
 plt.style.use('ggplot')
+
+
+class ObjectiveFunctionType(Enum):
+    LCOE = 0,
+    GridUsage = 1,
+    GridUsageCost = 2,
+    GridUsageCost_times_LCOE = 3
 
 
 class Demand:
@@ -272,7 +280,22 @@ class MicroGrid(QThread):
     dim = 3  # 3 variables to optimize
 
     def __init__(self, solar_farm: SolarFarm, wind_farm: WindFarm, demand_system: Demand, battery_system: BatterySystem,
-                 time_arr, LCOE_years=20, investment_rate=0.03, spot_price=None, band_price=None, maxeval=1000):
+                 time_arr, LCOE_years=20, investment_rate=0.03, spot_price=None, band_price=None, maxeval=1000,
+                 obj_fun_type: ObjectiveFunctionType=ObjectiveFunctionType.GridUsage):
+        """
+
+        :param solar_farm:
+        :param wind_farm:
+        :param demand_system:
+        :param battery_system:
+        :param time_arr:
+        :param LCOE_years:
+        :param investment_rate:
+        :param spot_price:
+        :param band_price:
+        :param maxeval:
+        :param obj_fun_type:
+        """
 
         QThread.__init__(self)
 
@@ -295,6 +318,8 @@ class MicroGrid(QThread):
         self.spot_price = spot_price
 
         self.band_price = band_price
+
+        self.obj_fun_type = obj_fun_type
 
         # create a time index matching the length
         self.time = time_arr
@@ -419,18 +444,26 @@ class MicroGrid(QThread):
         lcoe_val = self.lcoe(generated_power_profile=self.grid_power, investment_cost=investment_cost,
                              discount_rate=self.investment_rate, verbose=verbose)
 
-        fx = sum(abs(self.grid_power))
+        # select the objective function
+        if self.obj_fun_type is ObjectiveFunctionType.LCOE:
+            fx = abs(lcoe_val)
+        elif self.obj_fun_type is ObjectiveFunctionType.GridUsage:
+            fx = sum(abs(self.grid_power))
+        elif self.obj_fun_type is ObjectiveFunctionType.GridUsageCost:
+            fx = sum(abs(self.grid_power * self.spot_price))
+        elif self.obj_fun_type is ObjectiveFunctionType.GridUsageCost_times_LCOE:
+            fx = sum(abs(self.grid_power * self.spot_price)) * (1-abs(lcoe_val))
+        else:
+            fx = 0
 
         self.x_fx.append([fx] + list(x) + [lcoe_val])
 
         self.iteration += 1
         prog = self.iteration / self.max_eval
-        print('progress:', prog)
+        # print('progress:', prog)
         self.progress_signal.emit(prog * 100)
 
         return fx
-
-        # return lcoe_val
 
     def lcoe(self, generated_power_profile, investment_cost, discount_rate, verbose=False):
 
@@ -464,7 +497,7 @@ class MicroGrid(QThread):
 
     def optimize(self):
         self.run()
-
+        
     def run(self):
         """
         Function that optimizes a MicroGrid Object
@@ -524,7 +557,6 @@ class MicroGrid(QThread):
 
         self.progress_text_signal.emit('Done!')
         self.done_signal.emit()
-
 
     def plot(self):
         """

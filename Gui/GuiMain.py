@@ -82,6 +82,17 @@ class MainGUI(QMainWindow):
         self.available_results.append('Battery state of charge')
         self.ui.results_comboBox.addItems(self.available_results)
 
+        self.obj_fun_dict = dict()
+
+        self.obj_fun_dict['LCOE'] = ObjectiveFunctionType.LCOE
+        self.obj_fun_dict['Grid usage'] = ObjectiveFunctionType.GridUsage
+        self.obj_fun_dict['Grid usage cost'] = ObjectiveFunctionType.GridUsageCost
+        self.obj_fun_dict['Grid usage cost x LCOE'] = ObjectiveFunctionType.GridUsageCost_times_LCOE
+        k = list(self.obj_fun_dict.keys())
+        k.sort()
+        self.ui.obj_function_comboBox.addItems(k)
+
+
         ################################################################################################################
         # Connections
         ################################################################################################################
@@ -195,6 +206,10 @@ class MainGUI(QMainWindow):
 
         max_eval = self.ui.max_eval_spinBox.value()
 
+        # simulation type
+        sel = self.ui.obj_function_comboBox.currentText()
+        obj_fun_type = self.obj_fun_dict[sel]
+
         self.micro_grid = MicroGrid(solar_farm=solar_farm,
                                     wind_farm=wind_farm,
                                     battery_system=battery,
@@ -203,7 +218,8 @@ class MainGUI(QMainWindow):
                                     LCOE_years=investment_years,
                                     spot_price=self.prices[:, 0] / 1000,
                                     band_price=self.prices[:, 1] / 1000,
-                                    maxeval=max_eval)
+                                    maxeval=max_eval,
+                                    obj_fun_type=obj_fun_type)
 
     def new_project(self):
         print('new_project')
@@ -305,7 +321,6 @@ class MainGUI(QMainWindow):
         self.plot_text_results()
         self.plot_results()
 
-
     def plot_text_results(self):
         """
         Print the test results
@@ -314,27 +329,37 @@ class MainGUI(QMainWindow):
 
         self.ui.plainTextEdit.clear()
 
-        str = 'Results: \n\n'
+        inv_map = {v: k for k, v in self.obj_fun_dict.items()}
 
-        str += 'Demand size:\t' + '{0:.2f}'.format(self.micro_grid.demand_system.nominal_power) + ' kW.\n'
-        str += 'Solar farm size:\t' + '{0:.2f}'.format(self.micro_grid.solution[0]) + ' kW.\n'
-        str += 'Wind farm size:\t' + '{0:.2f}'.format(self.micro_grid.solution[1]) + ' kW.\n'
-        str += 'Storage size:\t' + '{0:.2f}'.format(self.micro_grid.solution[2]) + ' kWh.\n'
+        val = 'Conditions: \n\n'
 
-        str += '\n'
+        val += 'Amortization years:\t' + '{0:.0f}'.format(self.micro_grid.lcoe_years) + '\n'
+        val += 'Discount rate:\t' + '{0:.2f}'.format(self.micro_grid.investment_rate) + '\n'
+        val += 'Optimizing for:\t' + inv_map[self.micro_grid.obj_fun_type] + '\n'
 
-        str += 'Solar farm cost:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.cost()) + ' €.\n'
-        str += 'Wind farm cost:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.cost()) + ' €.\n'
-        str += 'Storage cost:\t' + '{0:.2f}'.format(self.micro_grid.battery_system.cost()) + ' €.\n'
+        val += '\n'
 
-        str += '\n'
+        val += 'Results: \n\n'
 
-        str += 'Grid energy:\t' + '{0:.2f}'.format(self.micro_grid.grid_energy) + ' kWh.\n'
-        str += 'Energy cost:\t' + '{0:.2f}'.format(self.micro_grid.energy_cost) + ' €.\n'
-        str += 'investment_cost:\t' + '{0:.2f}'.format(self.micro_grid.investment_cost) + ' €.\n'
-        str += 'LCOE:\t\t' + '{0:.2f}'.format(self.micro_grid.lcoe_val) + ' €/kWh.\n'
+        val += 'Demand size:\t' + '{0:.2f}'.format(self.micro_grid.demand_system.nominal_power) + ' kW.\n'
+        val += 'Solar farm size:\t' + '{0:.2f}'.format(self.micro_grid.solution[0]) + ' kW.\n'
+        val += 'Wind farm size:\t' + '{0:.2f}'.format(self.micro_grid.solution[1]) + ' kW.\n'
+        val += 'Storage size:\t' + '{0:.2f}'.format(self.micro_grid.solution[2]) + ' kWh.\n'
 
-        self.ui.plainTextEdit.setPlainText(str)
+        val += '\n'
+
+        val += 'Solar farm cost:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.cost()) + ' €.\n'
+        val += 'Wind farm cost:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.cost()) + ' €.\n'
+        val += 'Storage cost:\t' + '{0:.2f}'.format(self.micro_grid.battery_system.cost()) + ' €.\n'
+
+        val += '\n'
+
+        val += 'Grid energy:\t' + '{0:.2f}'.format(self.micro_grid.grid_energy) + ' kWh.\n'
+        val += 'Energy cost:\t' + '{0:.2f}'.format(self.micro_grid.energy_cost) + ' €.\n'
+        val += 'investment_cost:\t' + '{0:.2f}'.format(self.micro_grid.investment_cost) + ' €.\n'
+        val += 'LCOE:\t\t' + '{0:.2f}'.format(self.micro_grid.lcoe_val) + ' €/kWh.\n'
+
+        self.ui.plainTextEdit.setPlainText(val)
 
     def plot_results(self):
         """
