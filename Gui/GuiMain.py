@@ -20,6 +20,7 @@ from collections import OrderedDict
 from enum import Enum
 from Gui.gui import *
 from PyQt5.QtWidgets import *
+from Gui.GuiFunctions import PandasModel
 import pandas as pd
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
@@ -145,14 +146,17 @@ class MainGUI(QMainWindow):
         self.ui.interest_rate_doubleSpinBox.setValue(0.03)
 
         # wind
+        self.ui.wind_farm_min_nominal_power_doubleSpinBox.setValue(0)
         self.ui.wind_farm_nominal_power_doubleSpinBox.setValue(1000)
         self.ui.wind_farm_unitary_cost_doubleSpinBox.setValue(900)
 
         # solar
+        self.ui.solar_farm_min_nominal_power_doubleSpinBox.setValue(0)
         self.ui.solar_farm_nominal_power_doubleSpinBox.setValue(1000)
         self.ui.solar_farm_unitary_cost_doubleSpinBox.setValue(200)
 
         # storage
+        self.ui.storage_min_nominal_energy_doubleSpinBox.setValue(0)
         self.ui.storage_max_nominal_energy_doubleSpinBox.setValue(10000)
         self.ui.storage_max_unitary_cost_doubleSpinBox.setValue(900)
         self.ui.storage_max_soc_doubleSpinBox.setValue(0.98)
@@ -165,6 +169,9 @@ class MainGUI(QMainWindow):
 
         :return:
         """
+
+        assert(self.demand_profile is not None)
+
         nominal_power = self.ui.demand_nominal_power_doubleSpinBox.value()
         start = self.ui.start_dateEdit.dateTime().toPyDateTime()
         investment_years = self.ui.investment_years_spinBox.value()
@@ -173,20 +180,25 @@ class MainGUI(QMainWindow):
                         nominal_power=nominal_power)
 
         # wind
+        wind_power_min = self.ui.wind_farm_min_nominal_power_doubleSpinBox.value()
         wind_power_max = self.ui.wind_farm_nominal_power_doubleSpinBox.value()
         unitary_cost = self.ui.wind_farm_unitary_cost_doubleSpinBox.value()
         wind_farm = WindFarm(self.wind_speed_profile, self.ag_curve_df,
+                             wind_power_min=wind_power_min,
                              wind_power_max=wind_power_max,
                              unitary_cost=unitary_cost)
 
         # solar
+        solar_power_min = self.ui.solar_farm_min_nominal_power_doubleSpinBox.value()
         solar_power_max = self.ui.solar_farm_nominal_power_doubleSpinBox.value()
         unitary_cost = self.ui.solar_farm_unitary_cost_doubleSpinBox.value()
         solar_farm = SolarFarm(self.solar_radiation_profile,
+                               solar_power_min=solar_power_min,
                                solar_power_max=solar_power_max,
                                unitary_cost=unitary_cost)
 
         # storage
+        battery_energy_min = self.ui.storage_min_nominal_energy_doubleSpinBox.value()
         battery_energy_max = self.ui.storage_max_nominal_energy_doubleSpinBox.value()
         unitary_cost = self.ui.storage_max_unitary_cost_doubleSpinBox.value()
         max_soc = self.ui.storage_max_soc_doubleSpinBox.value()
@@ -197,6 +209,7 @@ class MainGUI(QMainWindow):
                                 discharge_efficiency=discharge_efficiency,
                                 max_soc=max_soc,
                                 min_soc=min_soc,
+                                battery_energy_min=battery_energy_min,
                                 battery_energy_max=battery_energy_max,
                                 unitary_cost=unitary_cost)
 
@@ -210,16 +223,31 @@ class MainGUI(QMainWindow):
         sel = self.ui.obj_function_comboBox.currentText()
         obj_fun_type = self.obj_fun_dict[sel]
 
-        self.micro_grid = MicroGrid(solar_farm=solar_farm,
-                                    wind_farm=wind_farm,
-                                    battery_system=battery,
-                                    demand_system=demand,
-                                    time_arr=self.time,
-                                    LCOE_years=investment_years,
-                                    spot_price=self.prices[:, 0] / 1000,
-                                    band_price=self.prices[:, 1] / 1000,
-                                    maxeval=max_eval,
-                                    obj_fun_type=obj_fun_type)
+        if self.ui.brute_force_radioButton.isChecked():
+
+            self.micro_grid = MicroGridBrute(solar_farm=solar_farm,
+                                             wind_farm=wind_farm,
+                                             battery_system=battery,
+                                             demand_system=demand,
+                                             time_arr=self.time,
+                                             LCOE_years=investment_years,
+                                             spot_price=self.prices[:, 0] / 1000,
+                                             band_price=self.prices[:, 1] / 1000,
+                                             maxeval=max_eval,
+                                             obj_fun_type=obj_fun_type)
+        else:
+
+            self.micro_grid = MicroGrid(solar_farm=solar_farm,
+                                        wind_farm=wind_farm,
+                                        battery_system=battery,
+                                        demand_system=demand,
+                                        time_arr=self.time,
+                                        LCOE_years=investment_years,
+                                        spot_price=self.prices[:, 0] / 1000,
+                                        band_price=self.prices[:, 1] / 1000,
+                                        maxeval=max_eval,
+                                        obj_fun_type=obj_fun_type)
+
 
     def new_project(self):
         print('new_project')
@@ -320,6 +348,7 @@ class MainGUI(QMainWindow):
         # plt.plot()
         self.plot_text_results()
         self.plot_results()
+        self.ui.results_tableView.setModel(PandasModel(self.micro_grid.x_fx))
 
     def plot_text_results(self):
         """
@@ -421,7 +450,6 @@ class MainGUI(QMainWindow):
                 print()
 
             self.ui.resultsPlot.redraw()
-
 
     def plot_input(self, arr, ylabel='', xlabel='', title=''):
         """

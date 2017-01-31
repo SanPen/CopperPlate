@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from itertools import product
 from enum import Enum
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
@@ -42,7 +43,7 @@ class Demand:
 
 class SolarFarm:
 
-    def __init__(self, profile, solar_power_max=10000, unitary_cost=200):
+    def __init__(self, profile, solar_power_min=0, solar_power_max=10000, unitary_cost=200):
         """
 
         Args:
@@ -57,6 +58,8 @@ class SolarFarm:
         self.normalized_power = profile / 1000.0
 
         self.max_power = solar_power_max
+
+        self.min_power = solar_power_min
 
         self.unitary_cost = unitary_cost
 
@@ -73,7 +76,7 @@ class SolarFarm:
 
 class WindFarm:
 
-    def __init__(self, profile, wt_curve_df, wind_power_max=10000, unitary_cost=900):
+    def __init__(self, profile, wt_curve_df, wind_power_min=0, wind_power_max=10000, unitary_cost=900):
         """
 
         Args:
@@ -97,6 +100,8 @@ class WindFarm:
 
         self.max_power = wind_power_max
 
+        self.min_power = wind_power_min
+
         self.unitary_cost = unitary_cost
 
     def power(self):
@@ -119,7 +124,7 @@ class BatterySystem:
     time = None
 
     def __init__(self, charge_efficiency=0.9, discharge_efficiency=0.9, max_soc=0.99, min_soc=0.3,
-                 battery_energy_max=100000, unitary_cost=900):
+                 battery_energy_min=0, battery_energy_max=100000, unitary_cost=900):
         """
 
         Args:
@@ -148,6 +153,8 @@ class BatterySystem:
         self.charge_per_cycle = 0.1  # charge 10% per cycle
 
         self.max_energy = battery_energy_max
+
+        self.min_energy = battery_energy_min
 
         self.unitary_cost = unitary_cost
 
@@ -349,7 +356,7 @@ class MicroGrid(QThread):
         self.max_eval = maxeval
 
         self.optimization_values = None
-
+        self.raw_results = None
         self.solution = None
 
         self.grid_energy = None
@@ -456,7 +463,8 @@ class MicroGrid(QThread):
         else:
             fx = 0
 
-        self.x_fx.append([fx] + list(x) + [lcoe_val])
+        # store the values
+        self.raw_results.append([fx] + list(x))
 
         self.iteration += 1
         prog = self.iteration / self.max_eval
@@ -507,10 +515,10 @@ class MicroGrid(QThread):
 
         """
         self.iteration = 0
-        self.x_fx = list()
+        self.raw_results = list()
 
         self.progress_signal.emit(0)
-        self.progress_text_signal.emit('Optimizing facility sizes..')
+        self.progress_text_signal.emit('Optimizing facility sizes by surrogate optimization...')
 
         # (1) Optimization problem
         # print(data.info)
@@ -530,7 +538,7 @@ class MicroGrid(QThread):
         # Use the serial controller (uses only one thread)
         controller = SerialController(self.objfunction)
 
-        # (5) Use the sychronous strategy without non-bound constraints
+        # (5) Use the synchronous strategy without non-bound constraints
         strategy = SyncStrategyNoConstraints(
             worker_id=0, data=self, maxeval=self.max_eval, nsamples=1,
             exp_design=exp_des, response_surface=surrogate,
@@ -551,8 +559,8 @@ class MicroGrid(QThread):
         self.optimization_values = np.array([o.value for o in controller.fevals])
 
         # turn the results into a DataFrame
-        self.x_fx = np.array(self.x_fx)
-        self.x_fx = pd.DataFrame(data=self.x_fx[:, 1:], index=self.x_fx[:, 0], columns=['Solar', 'Wind', 'Battery', 'LCOE'])
+        data = np.array(self.raw_results)
+        self.x_fx = pd.DataFrame(data=data[:, 1:], index=data[:, 0], columns=['Solar', 'Wind', 'Battery'])
         self.x_fx.sort_index(inplace=True)
 
         self.progress_text_signal.emit('Done!')
@@ -608,7 +616,7 @@ class MicroGrid(QThread):
         plt.ylabel('Per unit')
         plt.legend()
 
-    def plot_optimization(self, ax = None):
+    def plot_optimization(self, ax=None):
         """
         Plot the optimization convergence
         Returns:
@@ -626,6 +634,69 @@ class MicroGrid(QThread):
             ax.set_xlabel('Evaluations')
             ax.set_ylabel('Function Value')
             ax.set_title('Optimization convergence')
+
+
+class MicroGridBrute(MicroGrid):
+
+    def __init__(self, solar_farm: SolarFarm, wind_farm: WindFarm, demand_system: Demand, battery_system: BatterySystem,
+                 time_arr, LCOE_years=20, investment_rate=0.03, spot_price=None, band_price=None, maxeval=1000,
+                 obj_fun_type: ObjectiveFunctionType=ObjectiveFunctionType.GridUsage):
+        """
+
+        :param solar_farm:
+        :param wind_farm:
+        :param demand_system:
+        :param battery_system:
+        :param time_arr:
+        :param LCOE_years:
+        :param investment_rate:
+        :param spot_price:
+        :param band_price:
+        :param maxeval:
+        :param obj_fun_type:
+        """
+
+        MicroGrid.__init__(self, solar_farm, wind_farm, demand_system, battery_system,
+                           time_arr, LCOE_years, investment_rate, spot_price, band_price,
+                           maxeval, obj_fun_type)
+
+    def run(self):
+        """
+
+        :return:
+        """
+
+        self.progress_signal.emit(0)
+        self.progress_text_signal.emit('Optimizing facility sizes by brute force...')
+
+        step = self.max_eval
+        solar_range = np.arange(self.solar_farm.min_power, self.solar_farm.max_power + step, step)
+        wind_range = np.arange(self.wind_farm.min_power, self.wind_farm.max_power + step, step)
+        storage_range = np.arange(self.battery_system.min_energy, self.battery_system.max_energy + step, step)
+        self.max_eval = len(solar_range) * len(wind_range) * len(storage_range)
+        self.iteration = 0
+        self.raw_results = list()
+
+        # Run all the combinations
+        for solar_x, wind_x, storage_x in product(solar_range, wind_range, storage_range):
+            x = np.array([solar_x, wind_x, storage_x])
+            res = self.objfunction(x)
+            # results.append(np.r_[x, res])
+
+        data = np.array(self.raw_results)
+        self.x_fx = pd.DataFrame(data=data[:, 1:], index=data[:, 0], columns=['Solar', 'Wind', 'Battery'])
+
+        # Extract function values from the controller
+        self.optimization_values = data[:, 0].copy()
+
+        # Sort to pick the best
+        self.x_fx.sort_index(inplace=True)
+
+        # the best solution, after sorting, is the first one
+        self.solution = self.x_fx.values[0, :]
+
+        self.progress_text_signal.emit('Done!')
+        self.done_signal.emit()
 
 if __name__ == '__main__':
 

@@ -409,9 +409,9 @@
                <property name="geometry">
                 <rect>
                  <x>0</x>
-                 <y>0</y>
+                 <y>-126</y>
                  <width>894</width>
-                 <height>653</height>
+                 <height>686</height>
                 </rect>
                </property>
                <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -536,20 +536,6 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="wind_farm_nominal_power_doubleSpinBox">
-                       <property name="maximum">
-                        <double>999999999.000000000000000</double>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="0" column="0">
-                      <widget class="QLabel" name="label_5">
-                       <property name="text">
-                        <string>Max. nominal power</string>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="1" column="2">
                       <widget class="QLabel" name="label_10">
                        <property name="text">
@@ -585,6 +571,41 @@
                        </property>
                       </widget>
                      </item>
+                     <item row="0" column="5">
+                      <widget class="QLabel" name="label_31">
+                       <property name="text">
+                        <string>kW</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="label_30">
+                       <property name="text">
+                        <string>Min. nominal power</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="1">
+                      <widget class="QDoubleSpinBox" name="wind_farm_min_nominal_power_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="4">
+                      <widget class="QDoubleSpinBox" name="wind_farm_nominal_power_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="3">
+                      <widget class="QLabel" name="label_5">
+                       <property name="text">
+                        <string>Max. nominal power</string>
+                       </property>
+                      </widget>
+                     </item>
                     </layout>
                    </item>
                   </layout>
@@ -608,7 +629,7 @@
                      <item row="0" column="0">
                       <widget class="QLabel" name="label_7">
                        <property name="text">
-                        <string>Max. nominal power</string>
+                        <string>Min. nominal power</string>
                        </property>
                       </widget>
                      </item>
@@ -627,14 +648,7 @@
                       </widget>
                      </item>
                      <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="solar_farm_nominal_power_doubleSpinBox">
-                       <property name="maximum">
-                        <double>999999999.000000000000000</double>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="1" column="1">
-                      <widget class="QDoubleSpinBox" name="solar_farm_unitary_cost_doubleSpinBox">
+                      <widget class="QDoubleSpinBox" name="solar_farm_min_nominal_power_doubleSpinBox">
                        <property name="maximum">
                         <double>999999999.000000000000000</double>
                        </property>
@@ -647,10 +661,38 @@
                        </property>
                       </widget>
                      </item>
+                     <item row="1" column="1">
+                      <widget class="QDoubleSpinBox" name="solar_farm_unitary_cost_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
                      <item row="1" column="2">
                       <widget class="QLabel" name="label_12">
                        <property name="text">
                         <string>€ / kW</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="4">
+                      <widget class="QDoubleSpinBox" name="solar_farm_nominal_power_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="3">
+                      <widget class="QLabel" name="label_34">
+                       <property name="text">
+                        <string>Max. nominal power</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="5">
+                      <widget class="QLabel" name="label_35">
+                       <property name="text">
+                        <string>kW</string>
                        </property>
                       </widget>
                      </item>
@@ -674,6 +716,13 @@
                   <layout class="QVBoxLayout" name="verticalLayout_7">
                    <item>
                     <layout class="QGridLayout" name="gridLayout_5">
+                     <item row="1" column="3">
+                      <widget class="QLabel" name="label_17">
+                       <property name="text">
+                        <string>Max state of charge</string>
+                       </property>
+                      </widget>
+                     </item>
                      <item row="2" column="5">
                       <widget class="QLabel" name="label_23">
                        <property name="text">
@@ -688,20 +737,6 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="4">
-                      <widget class="QDoubleSpinBox" name="storage_max_unitary_cost_doubleSpinBox">
-                       <property name="maximum">
-                        <double>999999999.000000000000000</double>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="1" column="3">
-                      <widget class="QLabel" name="label_17">
-                       <property name="text">
-                        <string>Max state of charge</string>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="0" column="2">
                       <widget class="QLabel" name="label_8">
                        <property name="text">
@@ -712,7 +747,7 @@
                      <item row="0" column="0">
                       <widget class="QLabel" name="label_9">
                        <property name="text">
-                        <string>Max. nominal energy</string>
+                        <string>Min. nominal energy</string>
                        </property>
                       </widget>
                      </item>
@@ -731,16 +766,9 @@
                       </widget>
                      </item>
                      <item row="0" column="1">
-                      <widget class="QDoubleSpinBox" name="storage_max_nominal_energy_doubleSpinBox">
+                      <widget class="QDoubleSpinBox" name="storage_min_nominal_energy_doubleSpinBox">
                        <property name="maximum">
                         <double>999999999.000000000000000</double>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="0" column="5">
-                      <widget class="QLabel" name="label_15">
-                       <property name="text">
-                        <string>€ / kWh</string>
                        </property>
                       </widget>
                      </item>
@@ -779,13 +807,6 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="3">
-                      <widget class="QLabel" name="label_14">
-                       <property name="text">
-                        <string>Unitary cost</string>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="1" column="0">
                       <widget class="QLabel" name="label_16">
                        <property name="text">
@@ -797,6 +818,48 @@
                       <widget class="QLabel" name="label_18">
                        <property name="text">
                         <string>per unit</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="label_14">
+                       <property name="text">
+                        <string>Unitary cost</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QDoubleSpinBox" name="storage_max_unitary_cost_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="2">
+                      <widget class="QLabel" name="label_15">
+                       <property name="text">
+                        <string>€ / kWh</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="5">
+                      <widget class="QLabel" name="label_32">
+                       <property name="text">
+                        <string>kWh</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="4">
+                      <widget class="QDoubleSpinBox" name="storage_max_nominal_energy_doubleSpinBox">
+                       <property name="maximum">
+                        <double>999999999.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="3">
+                      <widget class="QLabel" name="label_33">
+                       <property name="text">
+                        <string>Max. nominal energy</string>
                        </property>
                       </widget>
                      </item>
@@ -820,7 +883,7 @@
        <attribute name="title">
         <string>Simulation</string>
        </attribute>
-       <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <layout class="QVBoxLayout" name="verticalLayout_10">
         <item>
          <widget class="QSplitter" name="splitter_2">
           <property name="orientation">
@@ -862,12 +925,19 @@
               </layout>
              </widget>
             </item>
-            <item row="0" column="0">
+            <item row="0" column="0" colspan="2">
              <widget class="QGroupBox" name="groupBox_6">
               <property name="title">
                <string>Optimization</string>
               </property>
               <layout class="QGridLayout" name="gridLayout_7">
+               <item row="0" column="2">
+                <widget class="QLabel" name="label_29">
+                 <property name="text">
+                  <string>Objective to minimize</string>
+                 </property>
+                </widget>
+               </item>
                <item row="1" column="1">
                 <widget class="QSpinBox" name="max_eval_spinBox">
                  <property name="minimum">
@@ -898,10 +968,10 @@
                  </property>
                 </widget>
                </item>
-               <item row="0" column="2">
-                <widget class="QLabel" name="label_29">
+               <item row="2" column="1">
+                <widget class="QRadioButton" name="brute_force_radioButton">
                  <property name="text">
-                  <string>Objective to minimize</string>
+                  <string>Use brute force</string>
                  </property>
                 </widget>
                </item>
@@ -910,7 +980,43 @@
             </item>
            </layout>
           </widget>
-          <widget class="MatplotlibWidget" name="resultsPlot" native="true"/>
+          <widget class="QFrame" name="frame">
+           <property name="frameShape">
+            <enum>QFrame::StyledPanel</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Raised</enum>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_8">
+            <item>
+             <widget class="QTabWidget" name="tabWidget_2">
+              <property name="currentIndex">
+               <number>0</number>
+              </property>
+              <widget class="QWidget" name="tab">
+               <attribute name="title">
+                <string>Plot</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="verticalLayout_9">
+                <item>
+                 <widget class="MatplotlibWidget" name="resultsPlot" native="true"/>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="tab_2">
+               <attribute name="title">
+                <string>Optimization data</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="verticalLayout_11">
+                <item>
+                 <widget class="QTableView" name="results_tableView"/>
+                </item>
+               </layout>
+              </widget>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
