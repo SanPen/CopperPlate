@@ -1,1 +1,1 @@
-python ./Gui/GuiMain.py
+python RunCopperPlate.py
