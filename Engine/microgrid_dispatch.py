@@ -55,6 +55,8 @@ class SolarFarm:
 
         self.nominal_power = None
 
+        self.irradiation = profile
+
         self.normalized_power = profile / 1000.0
 
         self.max_power = solar_power_max
@@ -72,6 +74,7 @@ class SolarFarm:
 
     def cost(self):
         return self.unitary_cost * self.nominal_power
+
 
 
 class WindFarm:
@@ -93,8 +96,12 @@ class WindFarm:
 
         self.nominal_power = None
 
+        self.wt_curve_df = wt_curve_df
+
         # load the wind turbine power curve and normalize it
         ag_curve = interp1d(wt_curve_df.index, wt_curve_df.values / wt_curve_df.values.max())
+
+        self.wind_speed = profile
 
         self.normalized_power = ag_curve(profile)
 
@@ -634,6 +641,43 @@ class MicroGrid(QThread):
             ax.set_xlabel('Evaluations')
             ax.set_ylabel('Function Value')
             ax.set_title('Optimization convergence')
+
+    def export(self, file_name):
+        """
+        Export definition and results to excel
+        :param file_name:
+        :return:
+        """
+
+        writer = pd.ExcelWriter(file_name)
+
+        # Solar irradiation
+        pd.DataFrame(data=self.solar_farm.irradiation,
+                     index=self.time,
+                     columns=['irradiation (MW/m2)']).to_excel(writer, 'irradiation')
+
+        # wind speed
+        pd.DataFrame(data=self.wind_farm.wind_speed,
+                     index=self.time,
+                     columns=['VEL(m/s):60']).to_excel(writer, 'wind')
+
+        # AG curve
+        self.wind_farm.wt_curve_df.to_excel(writer, 'AG_CAT')
+
+        # demand
+        pd.DataFrame(data=self.demand_system.normalized_power * -1,
+                     index=self.time,
+                     columns=['normalized_demand']).to_excel(writer, 'demand')
+
+        # prices
+        pd.DataFrame(data=np.c_[self.spot_price, self.band_price],
+                     index=self.time,
+                     columns=['Secondary_reg_price', 'Spot_price']).to_excel(writer, 'prices')
+
+        # Results
+        self.x_fx.to_excel(writer, 'results')
+
+        writer.save()
 
 
 class MicroGridBrute(MicroGrid):
