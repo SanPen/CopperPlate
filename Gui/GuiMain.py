@@ -388,12 +388,6 @@ class MainGUI(QMainWindow):
 
         val += '\n'
 
-        val += 'Solar farm cost:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.cost()) + ' €.\n'
-        val += 'Wind farm cost:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.cost()) + ' €.\n'
-        val += 'Storage cost:\t' + '{0:.2f}'.format(self.micro_grid.battery_system.cost()) + ' €.\n'
-
-        val += '\n'
-
         val += 'Solar farm energy:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.power().sum()) + ' kWh.\n'
         val += 'Wind farm energy:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.power().sum()) + ' kWh.\n'
         val += 'Storage energy throughput:\t' + '{0:.2f}'.format(abs(self.micro_grid.battery_output_power).sum()) + ' kWh.\n'
@@ -402,8 +396,11 @@ class MainGUI(QMainWindow):
 
         val += '\n'
 
-        val += 'Energy cost:\t' + '{0:.2f}'.format(self.micro_grid.energy_cost) + ' €.\n'
-        val += 'investment_cost:\t' + '{0:.2f}'.format(self.micro_grid.investment_cost) + ' €.\n'
+        val += 'Solar farm cost:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.cost()) + ' €.\n'
+        val += 'Wind farm cost:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.cost()) + ' €.\n'
+        val += 'Storage cost:\t' + '{0:.2f}'.format(self.micro_grid.battery_system.cost()) + ' €.\n'
+        val += 'Grid energy cost:\t' + '{0:.2f}'.format(self.micro_grid.energy_cost) + ' €.\n'
+        val += 'Investment cost:\t' + '{0:.2f}'.format(self.micro_grid.investment_cost) + ' €.\n'
         val += 'LCOE:\t\t' + '{0:.2f}'.format(self.micro_grid.lcoe_val) + ' €/kWh.\n'
 
         self.ui.plainTextEdit.setPlainText(val)
