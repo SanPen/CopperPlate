@@ -254,10 +254,10 @@ class PandasModel(QtCore.QAbstractTableModel):
     def headerData(self, p_int, orientation, role):
         if role == QtCore.Qt.DisplayRole:
             if orientation == QtCore.Qt.Horizontal:
-                return self._cols[p_int]
+                return str(self._cols[p_int])
             elif orientation == QtCore.Qt.Vertical:
                 if self.index is None:
-                    return p_int
+                    return str(p_int)
                 else:
                     if self.isDate:
                         return self.index[p_int].strftime('%Y/%m/%d  %H:%M.%S')

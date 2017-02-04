@@ -81,6 +81,8 @@ class MainGUI(QMainWindow):
         self.available_results.append('Power demanded to the grid')
         self.available_results.append('Battery power effectively processed')
         self.available_results.append('Battery state of charge')
+        self.available_results.append('LCOE vs. Grid energy')
+        self.available_results.append('LCOE vs. Investment')
         self.ui.results_comboBox.addItems(self.available_results)
 
         self.obj_fun_dict = dict()
@@ -170,7 +172,10 @@ class MainGUI(QMainWindow):
         :return:
         """
 
-        assert(self.demand_profile is not None)
+        # assert(self.demand_profile is not None)
+        if self.demand_profile is None:
+            self.msg('There are no profiles')
+            return
 
         nominal_power = self.ui.demand_nominal_power_doubleSpinBox.value()
         start = self.ui.start_dateEdit.dateTime().toPyDateTime()
@@ -248,7 +253,6 @@ class MainGUI(QMainWindow):
                                         maxeval=max_eval,
                                         obj_fun_type=obj_fun_type)
 
-
     def new_project(self):
         print('new_project')
 
@@ -320,19 +324,21 @@ class MainGUI(QMainWindow):
 
         :return:
         """
-        print('Working on it...')
+
         # create a micro grid object
         self.make_simulation_object()
 
-        self.lock()
+        if self.micro_grid is not None:
+            print('Working on it...')
+            self.lock()
 
-        # make connections
-        self.micro_grid.progress_signal.connect(self.ui.progressBar.setValue)
-        self.micro_grid.done_signal.connect(self.unlock)
-        self.micro_grid.done_signal.connect(self.post_size_devices)
+            # make connections
+            self.micro_grid.progress_signal.connect(self.ui.progressBar.setValue)
+            self.micro_grid.done_signal.connect(self.unlock)
+            self.micro_grid.done_signal.connect(self.post_size_devices)
 
-        # thread start
-        self.micro_grid.start()
+            # thread start
+            self.micro_grid.start()
 
     def post_size_devices(self):
         """
@@ -349,6 +355,11 @@ class MainGUI(QMainWindow):
         self.plot_text_results()
         self.plot_results()
         self.ui.results_tableView.setModel(PandasModel(self.micro_grid.x_fx))
+
+        years_arr = [10, 15, 20, 25, 30, 40]
+        inv_rate_arr = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+        df_lcoe = self.micro_grid.economic_sensitivity(years_arr, inv_rate_arr)
+        self.ui.economic_tableView.setModel(PandasModel(df_lcoe))
 
     def plot_text_results(self):
         """
@@ -443,6 +454,24 @@ class MainGUI(QMainWindow):
 
                 ax.plot(self.micro_grid.battery_state_of_charge, label=sel)
                 ax.set_ylabel('Per unit')
+                ax.set_title(sel)
+                ax.legend()
+
+            elif sel == 'LCOE vs. Grid energy':
+                x = self.micro_grid.x_fx['Grid energy'].values
+                y = self.micro_grid.x_fx['LCOE'].values
+                ax.scatter(x, y)
+                ax.set_xlabel('Grid energy [kWh]')
+                ax.set_ylabel('LCOE [€/kWh]')
+                ax.set_title(sel)
+                ax.legend()
+
+            elif sel == 'LCOE vs. Investment':
+                x = self.micro_grid.x_fx['Investment'].values
+                y = self.micro_grid.x_fx['LCOE'].values
+                ax.scatter(x, y)
+                ax.set_xlabel('Investment [€]')
+                ax.set_ylabel('LCOE [€/kWh]')
                 ax.set_title(sel)
                 ax.legend()
 

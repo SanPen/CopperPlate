@@ -452,26 +452,30 @@ class MicroGrid(QThread):
         # self.grid_power = demanded_power - self.battery_output_power
 
         # compute the investment cost
-        investment_cost = self.solar_farm.cost() + self.wind_farm.cost() + self.battery_system.cost()
+        self.investment_cost = self.solar_farm.cost() + self.wind_farm.cost() + self.battery_system.cost()
 
         # compute the LCOE Levelized Cost Of Electricity
-        lcoe_val = self.lcoe(generated_power_profile=self.grid_power, investment_cost=investment_cost,
-                             discount_rate=self.investment_rate, verbose=verbose)
+        res = self.lcoe(generated_power_profile=self.grid_power, investment_cost=self.investment_cost,
+                        discount_rate=self.investment_rate, years=self.lcoe_years, verbose=verbose)
+        self.grid_energy = res[0]
+        self.energy_cost = res[1]
+        self.investment_cost = res[2]
+        self.lcoe_val = res[3]
 
         # select the objective function
         if self.obj_fun_type is ObjectiveFunctionType.LCOE:
-            fx = abs(lcoe_val)
+            fx = abs(self.lcoe_val)
         elif self.obj_fun_type is ObjectiveFunctionType.GridUsage:
             fx = sum(abs(self.grid_power))
         elif self.obj_fun_type is ObjectiveFunctionType.GridUsageCost:
             fx = sum(abs(self.grid_power * self.spot_price))
         elif self.obj_fun_type is ObjectiveFunctionType.GridUsageCost_times_LCOE:
-            fx = sum(abs(self.grid_power * self.spot_price)) * (1-abs(lcoe_val))
+            fx = sum(abs(self.grid_power * self.spot_price)) * (1-abs(self.lcoe_val))
         else:
             fx = 0
 
         # store the values
-        self.raw_results.append([fx] + list(x))
+        self.raw_results.append([fx] + list(x) + [self.lcoe_val, sum(abs(self.grid_power)), self.investment_cost])
 
         self.iteration += 1
         prog = self.iteration / self.max_eval
@@ -480,18 +484,25 @@ class MicroGrid(QThread):
 
         return fx
 
-    def lcoe(self, generated_power_profile, investment_cost, discount_rate, verbose=False):
+    def lcoe(self, generated_power_profile, investment_cost, discount_rate, years, verbose=False):
+        """
 
+        :param generated_power_profile:
+        :param investment_cost:
+        :param discount_rate:
+        :param verbose:
+        :return:
+        """
         grid_energy = generated_power_profile.sum()
         energy_cost = (generated_power_profile * self.spot_price).sum()
 
         # build the arrays for the n years
-        I = np.zeros(self.lcoe_years)  # investment
+        I = np.zeros(years)  # investment
         I[0] = investment_cost
-        E = np.ones(self.lcoe_years) * grid_energy  # gains/cost of electricity
-        M = np.ones(self.lcoe_years) * investment_cost * 0.1  # cost of maintainance
+        E = np.ones(years) * grid_energy  # gains/cost of electricity
+        M = np.ones(years) * investment_cost * 0.1  # cost of maintenance
 
-        dr = np.array([(1 + discount_rate)**(i+1) for i in range(self.lcoe_years)])
+        dr = np.array([(1 + discount_rate)**(i+1) for i in range(years)])
         A = (I + M / dr).sum()
         B = (E / dr).sum()
 
@@ -503,12 +514,41 @@ class MicroGrid(QThread):
             print('A:', A, 'B:', B)
             print('lcoe_val', A/B)
 
-        self.grid_energy = grid_energy
-        self.energy_cost = energy_cost
-        self.investment_cost = investment_cost
-        self.lcoe_val = A / B
+        # self.grid_energy = grid_energy
+        # self.energy_cost = energy_cost
+        # self.investment_cost = investment_cost
+        lcoe_val = A / B
 
-        return self.lcoe_val
+        return grid_energy, energy_cost, investment_cost, lcoe_val
+
+    def economic_sensitivity(self, years_arr, inv_rate_arr):
+        """
+
+        :param years_arr:
+        :param inv_rate_arr:
+        :return:
+        """
+        ny = len(years_arr)
+        ni = len(inv_rate_arr)
+        values = np.zeros((4, ni, ny))
+
+        for i, years in enumerate(years_arr):
+            for j, inv_rate in enumerate(inv_rate_arr):
+
+                grid_energy, \
+                energy_cost, \
+                investment_cost, \
+                lcoe_val = self.lcoe(generated_power_profile=self.grid_power,
+                                     investment_cost=self.investment_cost,
+                                     discount_rate=inv_rate,
+                                     years=years,
+                                     verbose=False)
+
+                values[:, j, i] = np.array([grid_energy, energy_cost, investment_cost, lcoe_val])
+
+        df_lcoe = pd.DataFrame(data=values[3, :, :], index=inv_rate_arr, columns=years_arr)
+
+        return df_lcoe
 
     def optimize(self):
         self.run()
@@ -567,7 +607,7 @@ class MicroGrid(QThread):
 
         # turn the results into a DataFrame
         data = np.array(self.raw_results)
-        self.x_fx = pd.DataFrame(data=data[:, 1:], index=data[:, 0], columns=['Solar', 'Wind', 'Battery'])
+        self.x_fx = pd.DataFrame(data=data[:, 1:], index=data[:, 0], columns=['Solar', 'Wind', 'Battery', 'LCOE', 'Grid energy', 'Investment'])
         self.x_fx.sort_index(inplace=True)
 
         self.progress_text_signal.emit('Done!')
@@ -728,7 +768,7 @@ class MicroGridBrute(MicroGrid):
             # results.append(np.r_[x, res])
 
         data = np.array(self.raw_results)
-        self.x_fx = pd.DataFrame(data=data[:, 1:], index=data[:, 0], columns=['Solar', 'Wind', 'Battery'])
+        self.x_fx = pd.DataFrame(data=data[:, 1:], index=data[:, 0], columns=['Solar', 'Wind', 'Battery', 'LCOE', 'Grid energy', 'Investment'])
 
         # Extract function values from the controller
         self.optimization_values = data[:, 0].copy()
