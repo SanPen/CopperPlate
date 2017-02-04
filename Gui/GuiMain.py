@@ -149,17 +149,17 @@ class MainGUI(QMainWindow):
 
         # wind
         self.ui.wind_farm_min_nominal_power_doubleSpinBox.setValue(0)
-        self.ui.wind_farm_nominal_power_doubleSpinBox.setValue(1000)
+        self.ui.wind_farm_nominal_power_doubleSpinBox.setValue(10000)
         self.ui.wind_farm_unitary_cost_doubleSpinBox.setValue(900)
 
         # solar
         self.ui.solar_farm_min_nominal_power_doubleSpinBox.setValue(0)
-        self.ui.solar_farm_nominal_power_doubleSpinBox.setValue(1000)
-        self.ui.solar_farm_unitary_cost_doubleSpinBox.setValue(200)
+        self.ui.solar_farm_nominal_power_doubleSpinBox.setValue(10000)
+        self.ui.solar_farm_unitary_cost_doubleSpinBox.setValue(700)
 
         # storage
         self.ui.storage_min_nominal_energy_doubleSpinBox.setValue(0)
-        self.ui.storage_max_nominal_energy_doubleSpinBox.setValue(10000)
+        self.ui.storage_max_nominal_energy_doubleSpinBox.setValue(100000)
         self.ui.storage_max_unitary_cost_doubleSpinBox.setValue(900)
         self.ui.storage_max_soc_doubleSpinBox.setValue(0.98)
         self.ui.storage_min_soc_doubleSpinBox.setValue(0.3)
@@ -394,7 +394,14 @@ class MainGUI(QMainWindow):
 
         val += '\n'
 
+        val += 'Solar farm energy:\t' + '{0:.2f}'.format(self.micro_grid.solar_farm.power().sum()) + ' kWh.\n'
+        val += 'Wind farm energy:\t' + '{0:.2f}'.format(self.micro_grid.wind_farm.power().sum()) + ' kWh.\n'
+        val += 'Storage energy throughput:\t' + '{0:.2f}'.format(abs(self.micro_grid.battery_output_power).sum()) + ' kWh.\n'
+        val += 'Storage energy balance:\t' + '{0:.2f}'.format(self.micro_grid.battery_output_power.sum()) + ' kWh.\n'
         val += 'Grid energy:\t' + '{0:.2f}'.format(self.micro_grid.grid_energy) + ' kWh.\n'
+
+        val += '\n'
+
         val += 'Energy cost:\t' + '{0:.2f}'.format(self.micro_grid.energy_cost) + ' €.\n'
         val += 'investment_cost:\t' + '{0:.2f}'.format(self.micro_grid.investment_cost) + ' €.\n'
         val += 'LCOE:\t\t' + '{0:.2f}'.format(self.micro_grid.lcoe_val) + ' €/kWh.\n'
